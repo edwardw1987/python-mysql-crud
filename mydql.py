@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-04 10:34:59
+# @Last Modified time: 2015-11-04 18:46:28
 __metaclass__ = type
 from MySQLdb.cursors import DictCursor
 from MySQLdb.connections import Connection
@@ -144,7 +144,7 @@ class Table:
 
     def iterfieldnames(self):
         for f in self.iterfields():
-            yield (f.mutation or '%s.%s' % (self.name, f.name))
+            yield (f.mutation or '%s.%s' % (self.alias or self.name, f.name))
 
     def __repr__(self):
         return '<type: %r, name: %r, alias: %r>' % (self.__class__.__name__, self.name, self.alias)
@@ -161,13 +161,18 @@ class Field:
         self._mutation = None
 
     @property
+    def fullname(self):
+        return '%s.%s' % (
+            self.tb.alias or self.tb.name,
+            self.name)
+
+    @property
     def mutation(self):
         return self._mutation
 
     def DateFormat(self, fmt, alias=''):
-        mut = 'DATE_FORMAT(%s.%s, %r) AS %s' % (
-            self.tb.alias or self.tb.name,
-            self.name,
+        mut = 'DATE_FORMAT(%s, %r) AS %s' % (
+            self.fullname,
             fmt,
             alias or self.name)
         self._mutation = mut
@@ -274,6 +279,15 @@ class QuerySet:
 
     def __init__(self, iterator):
         self.iterator = iterator
+
+    def groupby(self, fieldname):
+        _dict = {}
+        _key = itemgetter(fieldname)
+        for i in self.iterator:
+            k = _key(i)
+            _dict.setdefault(k, [])
+            _dict[k].append(i)
+        return _dict
 
     def orderby(self, field, desc=False):
         ls = list(self.iterator)
@@ -383,7 +397,8 @@ class DQL:
 
         # ==============================
         if fields is None:
-            _fields = ', '.join(set(self.fields) - set(excludes or []))
+            _fields_set = set(self.fields)
+            _fields = ', '.join(_fields_set - set(excludes or []))
         else:
             _fields = ', '.join(fields or self.fields)
         #
