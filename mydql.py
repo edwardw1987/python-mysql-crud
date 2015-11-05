@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-05 13:31:31
+# @Last Modified time: 2015-11-05 13:59:32
 __metaclass__ = type
 from MySQLdb.cursors import DictCursor
 from MySQLdb.connections import Connection
@@ -89,13 +89,13 @@ class FieldStorage(set):
 
 class DataBase:
 
-    def __init__(self, host, dbname, user, passwd):
+    def __init__(self, host, db, user, passwd):
         self.host = host
-        self.name = dbname
+        self.name = db
         self.user = user
         self.passwd = passwd
         self.tables = Storage()
-        self._init_db(host=host, db=dbname, user=user, passwd=passwd)
+        self._init_db(host=host, db=db, user=user, passwd=passwd)
 
     def _init_db(self, **kwargs):
         mapping = self._init_mapping(**kwargs)
@@ -471,7 +471,7 @@ class DQL:
 
 
 def main():
-    db = DataBase(host='localhost', dbname='QGYM', user='root', passwd='123123')
+    db = DataBase(host='localhost', db='QGYM', user='root', passwd='123123')
     print db.dql().setmain('user_table').queryset.all()
 if __name__ == '__main__':
     main()
