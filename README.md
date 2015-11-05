@@ -2,8 +2,8 @@
 "mydql" is a simple extension module based on "MySQLdb" which is intended to make convenient-api for satisfying regular DQL-demand.
 
 ## hello,world
-<code>from mydql import connect</code><br>
-<code>db = connect(host='localhost', db='db', user='user', passwd='passwd')</code><br>
+<code>from mydql import DataBase</code><br>
+<code>db = DataBase(host='localhost', db='db', user='user', passwd='passwd')</code><br>
 <code>rows = db.dql().setmain('tablename').queryset.all()</code><br>
 ## features
 ##### chaining-call:
