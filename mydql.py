@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-05 13:59:32
+# @Last Modified time: 2015-11-05 18:36:18
 __metaclass__ = type
 from MySQLdb.cursors import DictCursor
 from MySQLdb.connections import Connection
@@ -193,6 +193,12 @@ class Field:
             alias or self.name)
         self._mutation = mut
         return mut
+
+    def GroupConcat(self, alias=''):
+        mut = 'GROUP_CONCAT(%s) AS %s' % (
+            self.fullname,
+            alias or self.name)
+        return mut
     
 
 class Joint:
@@ -212,11 +218,8 @@ class Joint:
     def _init_rel(self, rel):
         self.rel = rel.strip()
         self.duplication = self.rel.split('=')[0].strip()
-
-class Clause:
-    pass
     
-class WhereClause(Clause):
+class Condition:
 
     def __init__(self, dictObj):
         self.dict = self._valid_dict(dictObj)
@@ -283,9 +286,9 @@ class WhereClause(Clause):
                 value = ','.join(str(i) for i in value)
         return '{key} {condition}'.format(key=ckey, condition=(token % value))
 
-    def get_condition_sql(self):
+    def clause(self):
         """
-            GET Condition-SQL connected with keyword 'AND'
+            Get joined conditional clause with 'AND'
             e.g. ' AND a=1 AND b>2 AND c<10 ...'
         """
         return ' AND '.join(self.get_fraction(key) for key in self.dict.iterkeys())
@@ -346,7 +349,10 @@ class DQL:
     def __init__(self, db):
         self.db = db
         self.maintable = None
-        self.joints = []
+        self._distinct = False
+        self._joints = []
+        self._groupby = None
+        self._orderbys = []
 
     @property
     def fields(self):
@@ -363,7 +369,7 @@ class DQL:
         fls = []
         if self.maintable is not None:
             fls.extend(self.maintable.iterfieldnames())
-            for j in self.joints:
+            for j in self._joints:
                 fls.extend(j.tb.iterfieldnames())
         return tuple(fls)
 
@@ -401,20 +407,23 @@ class DQL:
         # having
         # union
         # not
-        _dql_format = 'SELECT {distinct}{fields} FROM {tables} WHERE {conditions}'
-        distinct = kwargs.get('distinct')
-        where = kwargs.get('where')
-        fields = kwargs.get('fields')
-        excludes = kwargs.get('excludes')
+        ks = kwargs
+        SELECT     = 'SELECT'
+        DISTINCT   = self._handle_distinct()
+        FIELDS     = self._handle_fields(ks.get('fields'), ks.get('excludes'))
+        FROM       = 'FROM'
+        TABLES     = self._relate(INNER_JOIN)
+        CONDITIONS = self._handle_conditions(ks.get('where'))
+        WHERE      = 'WHERE' if CONDITIONS else None
+        GROUP_BY   = self._handle_groupby()
+        # HAVING     = 
+        ORDER_BY   = self._handle_orderby()
+
+        [SELECT, DISTINCT, FIELDS, FROM, TABLES, WHERE, CONDITIONS, GROUP_BY, HAVING, ORDER_BY, LIMIT]
 
         # ==============================
-        if fields is None:
-            _fields_set = set(self.fields)
-            _fields = ', '.join(_fields_set - set(excludes or []))
-        else:
-            _fields = ', '.join(fields or self.fields)
         #
-        _where_clause = WhereClause(where).get_condition_sql() if where else '1=1'
+        _where_clause = Condition(where).clause() if where else '1=1'
         _dql = _dql_format.format(
             distinct='DISTINCT ' if distinct else '',
             fields=_fields,
@@ -422,6 +431,34 @@ class DQL:
             conditions=_where_clause,
         )
         return _dql
+
+    def _handle_conditions(self, where):
+        return Condition(where).clause() if where else None  
+
+    def _handle_distinct(self):
+        return 'DISTINCT' if self._distinct else None
+
+    def _handle_groupby(self):
+        if self._groupby is None:
+            return 
+        else:
+            return 'GROUP BY %s' % self._groupby
+
+    def _handle_orderby(self):
+        obs = self._orderbys
+        if obs == []:
+            return
+        else:
+            ob = ', '.join(obs)
+            return 'ORDER BY %s' % ob
+
+    def _handle_fields(self, fields, excludes):
+        if fields is None:
+            _fields_set = set(self.fields)
+            _fields = ', '.join(_fields_set - set(excludes or []))
+        else:
+            _fields = ', '.join(fields or self.fields)
+        return _fields
 
     def create_view(self, name, *args, **kwargs):
         self.db.cursor().execute('CREATE OR REPLACE VIEW {name} AS {dql} '.format(
@@ -447,17 +484,32 @@ class DQL:
     def inner_join(self, tblname, on, alias=''):
         tb = getattr(self.db.tables, tblname)
         tb.set_alias(alias)
-        self.joints.append(Joint(tb,on))
+        self._joints.append(Joint(tb,on))
         return self
 
-    def test(self):
-        cursor = self.db.cursor()
-        cursor.execute(self.get_dql())
-        return cursor.iterator()
+    def groupby(self, field, key=None):
+        """
+        field: str, name of field
+        defaults to group by field, if key is given then group by value key(field) returns
+        """
+        self._groupby = key and key(field) or field
+
+    def orderby(self, field, desc=False, key=None):
+        """
+        field: str, name of field
+        defaults to order by field, if key is given then order by value key(field) returns
+        """
+        into_desc = lambda f:'%s DESC' % f 
+        ob = key and key(field) or field 
+        if desc is True : ob = into_desc(ob)
+        self._orderbys.append(ob)
+
+    def distinct(self):
+        self._distinct = True
 
     def _relate(self, method):
         tbl = []
-        for j in self.joints:
+        for j in self._joints:
             f = '{name} AS {alias} ON {rel}' if bool(
                 j.tb.alias) is True else '{name} ON {rel}'
             tbl.append(
