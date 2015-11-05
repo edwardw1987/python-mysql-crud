@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-04 18:46:28
+# @Last Modified time: 2015-11-05 13:31:31
 __metaclass__ = type
 from MySQLdb.cursors import DictCursor
 from MySQLdb.connections import Connection
@@ -23,7 +23,7 @@ def connect(**kwargs):
     """
     kwargs['cursorclass'] = kwargs.pop('cursorclass', None) or DQLCursor
     kwargs['charset'] = kwargs.pop('charset', None) or 'utf8'
-    return DataBase(**kwargs)
+    return Connection(**kwargs)
 
 def dedupe(items):
     seen = set()
@@ -32,6 +32,7 @@ def dedupe(items):
             yield item
             seen.add(item)
 # ====================
+
 class DQLCursor(DictCursor):
     def iterator(self):
         while 1:    
@@ -86,18 +87,37 @@ class FieldStorage(set):
     pass
 
 
-class DataBase(Connection):
+class DataBase:
 
-    def __init__(self, **kwargs):
-        super(DataBase, self).__init__(**kwargs)
-        self._init_tables()
-
-    def _init_tables(self):
-        cursor = self.cursor()
-        cursor.execute('SHOW TABLES')
+    def __init__(self, host, dbname, user, passwd):
+        self.host = host
+        self.name = dbname
+        self.user = user
+        self.passwd = passwd
         self.tables = Storage()
-        for name in (next(r.itervalues()) for r in cursor.iterator()):
-            self.tables[name] = Table(db=self, name=name)
+        self._init_db(host=host, db=dbname, user=user, passwd=passwd)
+
+    def _init_db(self, **kwargs):
+        mapping = self._init_mapping(**kwargs)
+        for tblname, fl in mapping.iteritems():
+            self._init_table(tblname, fl)
+
+    def _init_table(self, tblname, fields):
+        self.tables[tblname] = Table(name=tblname, fields=fields)
+ 
+    def _init_mapping(self, **kwargs):
+        cursor = connect(**kwargs).cursor()
+        cursor.execute('SHOW TABLES')
+        tables = Storage()
+        for tbname in (next(r.itervalues()) for r in cursor.iterator()):
+            tables[tbname] = []
+        for key in tables:
+            cursor.execute('DESC %s' % key)
+            ls = tables[key]
+            for r in cursor.iterator():
+                ls.append(r['Field'])
+            tables[key] = tuple(tables[key])
+        return tables
 
     def GetTable(self, tblname):
         return self.tables[tblname]
@@ -124,19 +144,15 @@ class Table:
         represents a table in database
     """
 
-    def __init__(self, db, name, alias=''):
+    def __init__(self, name, fields, alias=''):
         self.name = name
         self.alias = alias
-        self.db = db
-        self._init_fields()
+        self._init_fields(fields)
 
-    def _init_fields(self):
-        cursor = self.db.cursor()
-        cursor.execute('DESC %s' % self.name)
-        fg = (Field(tb=self, name=r['Field']) for r in cursor.iterator())
-        self.fields = fs = Storage()
-        for f in fg:
-            fs[f.name] = f
+    def _init_fields(self, fields):
+        self.fields = Storage()
+        for fname in fields:
+            self.fields[fname] = Field(tb=self, name=fname)
 
     def iterfields(self):
         for f in self.fields.itervalues():
@@ -325,27 +341,23 @@ class DQL:
 
     """
 
-    def __enter__(self): return self
-
-    def __exit__(self, exc, value, tb): self.db.close()
-
     def __repr__(self): return 'MyDQL@MySQLdb'
 
     def __init__(self, db):
         self.db = db
         self.maintable = None
         self.joints = []
-        # self._init_tables()
 
-    # def _init_tables(self):
-    #     self.db.cursor().execute('SHOW TABLES')
-    #     tbl = []
-    #     for name in (r.values()[0] for r in cursor.fetchall()):
-    #         tbl.append(Table(dql=self, name=name))
-    #     self.tables = Store(tbl)
     @property
     def fields(self):
         return self._get_fields()
+
+    def cursor(self):
+        return connect(
+                host=self.db.host,
+                db=self.db.name,
+                user=self.db.user,
+                passwd=self.db.passwd).cursor()
 
     def _get_fields(self):
         fls = []
@@ -423,12 +435,12 @@ class DQL:
         return self.query()
 
     def query(self, *args, **kwargs):
-        cursor = self.db.cursor()
+        cursor = self.cursor()
         cursor.execute(self.get_dql(*args, **kwargs))
         return QuerySet(cursor.iterator())
 
     def queryone(self, *args, **kwargs):
-        cursor = self.db.cursor()
+        cursor = self.cursor()
         cursor.execute(self.get_dql(*args, **kwargs))
         return cursor.fetchone()
 
@@ -459,14 +471,7 @@ class DQL:
 
 
 def main():
-    # ==========
-    db = connect(host="localhost", db="db", user="root", passwd="123123")
-    dql = db.dql()
-    print dql.fields
-    dql.setmain('order_table')
-    print dql.fields
-    print dql.query(where={'order_id__lte': 10}).slice(0,1)
-    # ==========
-
+    db = DataBase(host='localhost', dbname='QGYM', user='root', passwd='123123')
+    print db.dql().setmain('user_table').queryset.all()
 if __name__ == '__main__':
     main()
