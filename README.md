@@ -3,7 +3,7 @@
 
 ## hello,world
 <code>from mydql import DataBase</code><br>
-<code>db = DataBase(host='localhost', dbname='db', user='user', passwd='passwd')</code><br>
+<code>db = DataBase(host='localhost', db='db', user='user', passwd='passwd')</code><br>
 <code>rows = db.dql().setmain('tablename').queryset.all()</code><br>
 ## features
 ##### chaining-call:
