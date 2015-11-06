@@ -10,12 +10,12 @@
 # templates
 # {{ static_url('css/style.css') }}
 # import tornado.autoreload
+import os
 from tornado.web import (
     RequestHandler, Application, url, HTTPError,authenticated)
 from tornado.ioloop import IOLoop
 from tornado.options import define
 import tornado
-import os
 from db import mydql
 
 class Handler(RequestHandler):
@@ -71,10 +71,7 @@ class TestData(Handler):
     def get(self):
         start = self.get_argument_into('startpos', 0, into=int)
         stop = start + self.get_argument_into('count', 10, into=int)
-        dql = mydql()
-        dql.setmain('student')
-        # dql.setmain('order_table')
-        results = dql.query(where={'DATE_FORMAT(sbirthday, "%Y-%m-%d")__gte':'1985-01-01'}).orderby('sbirthday', desc=True).slice(start, stop)
+        results = mydql().setmain('order_table', 'o').limit(11,10).query(fields=['o.order_contact_name']).all()
         self.write({'testdata': results})
 # tornado资源配置
 settings = {

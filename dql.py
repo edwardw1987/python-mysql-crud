@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-06 11:35:51
+# @Last Modified time: 2015-11-06 13:26:08
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -309,9 +309,11 @@ class DQL:
         """
         fields:
             expect a iterable-object contains names of fields to select
+            each name of field is expected to be in format 'table.field' or 'table_alias.field' if table_alias has been set. 
             if not given, defaults to 'self.fields' 
         excludes:
             expect a iterable-object contains names of fields to exclude among 'self.fields'
+            the requirement of format as same as 'fields'
             if 'fields' argument is given, it would be ignored
         """
         # distinct
@@ -381,11 +383,19 @@ class DQL:
         return method(tbl)
 
     def _handle_fields(self, fields, excludes):
+        allset = set(self.fields)
+        exset  = set(excludes or [])
+        inset  = set(fields or [])
+        union = allset | exset | inset
+        try:
+            assert allset == union
+        except AssertionError:
+            invalid = list(union - allset)[0]
+            raise ValueError('%r is invalid filedname' % invalid) 
         if fields is None:
-            _fields_set = set(self.fields)
-            _fields = ', '.join(_fields_set - set(excludes or []))
+            _fields = ', '.join(allset - exset)
         else:
-            _fields = ', '.join(fields or self.fields)
+            _fields = ', '.join(inset or allset)
         return _fields
 
     def create_view(self, name, *args, **kwargs):
