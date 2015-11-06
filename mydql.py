@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-05 18:36:18
+# @Last Modified time: 2015-11-06 11:13:10
 __metaclass__ = type
 from MySQLdb.cursors import DictCursor
 from MySQLdb.connections import Connection
@@ -288,7 +288,7 @@ class Condition:
 
     def clause(self):
         """
-            Get joined conditional clause with 'AND'
+            Get conditional clause joined with 'AND'
             e.g. ' AND a=1 AND b>2 AND c<10 ...'
         """
         return ' AND '.join(self.get_fraction(key) for key in self.dict.iterkeys())
@@ -319,7 +319,7 @@ class QuerySet:
 
     def values(self, field, distinct=False):
         vg = (i[field] for i in self.iterator)
-        if bool(distinct) is True:
+        if distinct is True:
             return tuple(dedupe(vg))
         else:
             return tuple(vg)
@@ -353,6 +353,9 @@ class DQL:
         self._joints = []
         self._groupby = None
         self._orderbys = []
+        self._where = None
+        self._having = None
+        self._limit = None
 
     @property
     def fields(self):
@@ -392,9 +395,6 @@ class DQL:
         excludes:
             expect a iterable-object contains names of fields to exclude among 'self.fields'
             if 'fields' argument is given, it would be ignored
-        where:
-            expect dict-object contains keyword-argument as fitering-condtions
-
         """
         # distinct
         # or
@@ -412,28 +412,25 @@ class DQL:
         DISTINCT   = self._handle_distinct()
         FIELDS     = self._handle_fields(ks.get('fields'), ks.get('excludes'))
         FROM       = 'FROM'
-        TABLES     = self._relate(INNER_JOIN)
-        CONDITIONS = self._handle_conditions(ks.get('where'))
-        WHERE      = 'WHERE' if CONDITIONS else None
+        TABLES     = self._handle_tables(method=INNER_JOIN)
+        WHERE      = self._handle_where()
         GROUP_BY   = self._handle_groupby()
-        # HAVING     = 
+        HAVING     = self._handle_having()
         ORDER_BY   = self._handle_orderby()
+        LIMIT      = self._handle_limit()
+        components = [ k for k in (
+            SELECT,DISTINCT, FIELDS, FROM, TABLES,
+            WHERE, GROUP_BY, HAVING, ORDER_BY, LIMIT) if k is not None]
+        return ' '.join(components)
 
-        [SELECT, DISTINCT, FIELDS, FROM, TABLES, WHERE, CONDITIONS, GROUP_BY, HAVING, ORDER_BY, LIMIT]
+    def _handle_limit(self):
+        return ('LIMIT %s,%s' % self._limit) if self._limit else None
 
-        # ==============================
-        #
-        _where_clause = Condition(where).clause() if where else '1=1'
-        _dql = _dql_format.format(
-            distinct='DISTINCT ' if distinct else '',
-            fields=_fields,
-            tables=self._relate(INNER_JOIN),
-            conditions=_where_clause,
-        )
-        return _dql
+    def _handle_where(self):
+        return ('WHERE %s' % self._where) if self._where else None  
 
-    def _handle_conditions(self, where):
-        return Condition(where).clause() if where else None  
+    def _handle_having(self):
+        return ('HAVING %s' % self._having) if self._having else None
 
     def _handle_distinct(self):
         return 'DISTINCT' if self._distinct else None
@@ -451,6 +448,19 @@ class DQL:
         else:
             ob = ', '.join(obs)
             return 'ORDER BY %s' % ob
+
+    def _handle_tables(self, method):
+        tbl = []
+        for j in self._joints:
+            f = '{name} AS {alias} ON {rel}' if bool(
+                j.tb.alias) is True else '{name} ON {rel}'
+            tbl.append(
+                f.format(name=j.tb.name, alias=j.tb.alias, rel=j.rel))
+        main_f = '{name} AS {alias}' if self.maintable.alias else '{name}'
+        main = main_f.format(
+            name=self.maintable.name, alias=self.maintable.alias)
+        tbl.insert(0, main)
+        return method(tbl)
 
     def _handle_fields(self, fields, excludes):
         if fields is None:
@@ -493,6 +503,15 @@ class DQL:
         defaults to group by field, if key is given then group by value key(field) returns
         """
         self._groupby = key and key(field) or field
+        return self
+
+    def having(self, dictObj):
+        self._having = Condition(dictObj).clause()
+        return self
+
+    def where(self, dictObj):
+        self._where = Condition(dictObj).clause()
+        return self
 
     def orderby(self, field, desc=False, key=None):
         """
@@ -503,27 +522,19 @@ class DQL:
         ob = key and key(field) or field 
         if desc is True : ob = into_desc(ob)
         self._orderbys.append(ob)
+        return self
 
     def distinct(self):
         self._distinct = True
+        return self
 
-    def _relate(self, method):
-        tbl = []
-        for j in self._joints:
-            f = '{name} AS {alias} ON {rel}' if bool(
-                j.tb.alias) is True else '{name} ON {rel}'
-            tbl.append(
-                f.format(name=j.tb.name, alias=j.tb.alias, rel=j.rel))
-        main_f = '{name} AS {alias}' if self.maintable.alias else '{name}'
-        main = main_f.format(
-            name=self.maintable.name, alias=self.maintable.alias)
-
-        tbl.insert(0, main)
-        return method(tbl)
+    def limit(self, startpos, count):
+        self._limit = startpos, count
+        return self
 
 
 def main():
     db = DataBase(host='localhost', db='QGYM', user='root', passwd='123123')
-    print db.dql().setmain('user_table').queryset.all()
+    print db.dql().setmain('user_table').limit(1,2).queryset.all()
 if __name__ == '__main__':
     main()
