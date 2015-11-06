@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-06 13:26:08
+# @Last Modified time: 2015-11-06 13:34:45
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -386,7 +386,7 @@ class DQL:
         allset = set(self.fields)
         exset  = set(excludes or [])
         inset  = set(fields or [])
-        union = allset | exset | inset
+        union  = allset | exset | inset
         try:
             assert allset == union
         except AssertionError:
