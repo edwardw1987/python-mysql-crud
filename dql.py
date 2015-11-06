@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-06 13:34:45
+# @Last Modified time: 2015-11-06 13:43:06
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -339,7 +339,7 @@ class DQL:
         ORDER_BY   = self._handle_orderby()
         LIMIT      = self._handle_limit()
         components = [ k for k in (
-            SELECT,DISTINCT, FIELDS, FROM, TABLES,
+            SELECT, DISTINCT, FIELDS, FROM, TABLES,
             WHERE, GROUP_BY, HAVING, ORDER_BY, LIMIT) if k is not None]
         return ' '.join(components)
 
