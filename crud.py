@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-07 16:33:44
+# @Last Modified time: 2015-11-08 00:11:35
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -146,13 +146,25 @@ class SQL:
     def __init__(self, db):
         super(SQL, self).__init__()
         self.db = db
+        self._connection = None
 
-    def cursor(self):
-        return connect(
+    def connect(self):
+        conn = connect(
                 host=self.db.host,
                 db=self.db.name,
                 user=self.db.user,
-                passwd=self.db.passwd).cursor()
+                passwd=self.db.passwd)
+        self._connection = conn
+        return conn
+        
+    def cursor(self):
+        return self.connect().cursor()
+
+    def commit(self):
+        return self._connection.commit()
+
+    def rollback(self):
+        return self._connection.rollback()
 
     def table(self, tblname, alias=''):
         tb = getattr(self.db.tables, tblname)
@@ -290,13 +302,6 @@ class DQL(SQL):
             _fields = ', '.join(inset or allset)
         return _fields
 
-    def create_view(self, name, *args, **kwargs):
-        self.db.cursor().execute('CREATE OR REPLACE VIEW {name} AS {dql} '.format(
-            name=name, dql=self.write(*args, **kwargs)))
-        _view = Table(db=self.db, name=name)
-        setattr(self.db, name, _view)
-        return _view
-
     @property
     def queryset(self):
         return self.query()
@@ -358,9 +363,9 @@ class DML(SQL):
     def __init__(self, db):
         super(DML, self).__init__(db)
         self._table  = None
-        self._create = []
-        self._update = None
-        self._delete = None
+        self._value = None
+        self._values = []
+        self._where  = None
 
     @property
     def fields(self):
@@ -369,17 +374,74 @@ class DML(SQL):
             fls.extend(self._table.iterfieldnames())
         return tuple(fls)
 
-    def insert_value(self, value={}, **kwargs):
-        _value = dictObj.update(kwargs)
-        self._create.append(_value)
+    def value(self, **kwargs):
+        self._value = kwargs
         return self
 
-    def insert_values(self, values):
-        self._create.extend(values)
+    def delete(self):
+        cursor = self.cursor()
+        cursor.execute(self.write('delete'))
+
+    def insert(self, **kwargs):
+        self.value(**kwargs)
+        cursor = self.cursor()
+        cursor.execute(self.write('insert'))
+        return self
+    # def values(self, values):
+    #     """
+    #     param 'values' expects for iterable-object contains dict 
+    #     """
+    #     for v in values:
+    #         self._values.append(values)
+    #     return self
+
+    def update(self, **kwargs):
+        self.value(**kwargs)
+        cursor = self.cursor()
+        cursor.execute(self.write('update'))
         return self
 
-    def write(self):
-        # to wirte sql of demand of `create` or `update` or `delete`
-        components = CREATE or UPDATE or DELETE
+    def where(self, dictObj={}, **kwargs):
+        _do = dictObj.copy()
+        _do.update(kwargs)
+        self._where = Condition(_do).clause()
+        return self
 
+    def write(self, key):
+        # to write sql for operation of `insert` or `update` or `delete`
+        # key str `insert/create`, `update`, `delete`
+        DICT = dict(INSERT = 'INSERT INTO',
+                    UPDATE = 'UPDATE',
+                    DELETE = 'DELETE FROM',)
+        try:
+            _key = key.upper()
+            KEYWD = DICT[_key]
+        except KeyError:
+            raise ValueError('unsupported type of %r' % _key)
+        else:
+            TABLE  = self._handle_table()
+            VALUE  = self._handle_value()
+            WHERE  = self._handle_where()
+            # VALUES = self._handle_values()
+            components = [k for k in (KEYWD, TABLE, VALUE, WHERE) if k is not None]
+            return ' '.join(components)
+
+    def _handle_table(self):
+        return self._table.name
+
+    def _handle_value(self):
+        if self._value is None:
+            return
+        else:
+            l = []
+            f = '%s=%s'
+            for k, v in self._value.iteritems():
+                if isinstance(v, basestring): f = '%s="%s"'
+                l.append(f % (k, v))
+            return 'SET %s' % (', '.join(l))
+
+    def _handle_values(self):
+        pass
         
+    def _handle_where(self):
+        return ('WHERE %s' % self._where) if self._where else None  

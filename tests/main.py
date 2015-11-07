@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:17:15
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-07 16:22:51
+# @Last Modified time: 2015-11-08 00:04:41
 import os
 from tornado.web import (
     RequestHandler, Application, url, HTTPError,authenticated)
@@ -27,8 +27,9 @@ class RegisterHandler(Handler):
         username = self.get_argument('username')
         password = self.get_argument('password')
         dml = DB.dml()
-        raise Exception(dml.table('user').fields)
-        # dml.table('user').insert_value(username=username, passwd=password)
+        # dml.table('user').insert(username=username, passwd=password).commit()
+        dml.table('user').where(uid=2).update(passwd='dddddd').commit()
+        # dml.table('user').where(uid=9).delete().commit()
         # captcha
 
 
