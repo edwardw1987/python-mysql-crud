@@ -3,124 +3,13 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-06 13:43:06
+# @Last Modified time: 2015-11-07 16:33:44
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
-from .utils import connect, dedupe, Storage
+from .utils import connect, dedupe
 
 
-class DataBase:
-
-    def __init__(self, host, db, user, passwd):
-        self.host = host
-        self.name = db
-        self.user = user
-        self.passwd = passwd
-        self.tables = Storage()
-        self._init_db(host=host, db=db, user=user, passwd=passwd)
-
-    def _init_db(self, **kwargs):
-        mapping = self._init_mapping(**kwargs)
-        for tblname, fl in mapping.iteritems():
-            self._init_table(tblname, fl)
-
-    def _init_table(self, tblname, fields):
-        self.tables[tblname] = Table(name=tblname, fields=fields)
- 
-    def _init_mapping(self, **kwargs):
-        cursor = connect(**kwargs).cursor()
-        cursor.execute('SHOW TABLES')
-        tables = Storage()
-        for tbname in (next(r.itervalues()) for r in cursor.iterator()):
-            tables[tbname] = []
-        for key in tables:
-            cursor.execute('DESC %s' % key)
-            ls = tables[key]
-            for r in cursor.iterator():
-                ls.append(r['Field'])
-            tables[key] = tuple(tables[key])
-        return tables
-
-    def GetTable(self, tblname):
-        return self.tables[tblname]
-
-    def IterTable(self, fieldname):
-        for table in self.tables.itervalues():
-            if fieldname in table.fields:
-                yield table
-
-    def GetField(self, tblname, fieldname):
-        return self.tables[tblname].fields[fieldname]
-
-    def IterField(self, fieldname):
-        for table in self.IterTable(fieldname):
-            yield table.fields[fieldname]
-
-    def dql(self):
-        return DQL(self)
-
-class Table:
-
-    """
-        represents a table in database
-    """
-
-    def __init__(self, name, fields, alias=''):
-        self.name = name
-        self.alias = alias
-        self._init_fields(fields)
-
-    def _init_fields(self, fields):
-        self.fields = Storage()
-        for fname in fields:
-            self.fields[fname] = Field(tb=self, name=fname)
-
-    def iterfields(self):
-        for f in self.fields.itervalues():
-            yield f
-
-    def iterfieldnames(self):
-        for f in self.iterfields():
-            yield (f.mutation or '%s.%s' % (self.alias or self.name, f.name))
-
-    def __repr__(self):
-        return '<type: %r, name: %r, alias: %r>' % (self.__class__.__name__, self.name, self.alias)
-
-    def set_alias(self, alias):
-        self.alias = alias
-
-class Field:
-
-    def __init__(self, tb, name):
-        self.tb = tb
-        self.name = name
-        self._mutation = None
-
-    @property
-    def fullname(self):
-        return '%s.%s' % (
-            self.tb.alias or self.tb.name,
-            self.name)
-
-    @property
-    def mutation(self):
-        return self._mutation
-
-    def DateFormat(self, fmt, alias=''):
-        mut = 'DATE_FORMAT(%s, %r) AS %s' % (
-            self.fullname,
-            fmt,
-            alias or self.name)
-        self._mutation = mut
-        return mut
-
-    def GroupConcat(self, alias=''):
-        mut = 'GROUP_CONCAT(%s) AS %s' % (
-            self.fullname,
-            alias or self.name)
-        return mut
-    
 class Joint:
 
     """
@@ -252,9 +141,35 @@ class QuerySet:
         """
         return tuple( i for i in islice(self.iterator, start, stop, step))
 
+class SQL:
+
+    def __init__(self, db):
+        super(SQL, self).__init__()
+        self.db = db
+
+    def cursor(self):
+        return connect(
+                host=self.db.host,
+                db=self.db.name,
+                user=self.db.user,
+                passwd=self.db.passwd).cursor()
+
+    def table(self, tblname, alias=''):
+        tb = getattr(self.db.tables, tblname)
+        tb.set_alias(alias)
+        self._table = tb
+        return self
+
+    @property
+    def fields(self):
+        pass
+
+    def write(self):
+        pass
+
 INNER_JOIN = lambda tbl: ' INNER JOIN '.join(tbl)
 
-class DQL:
+class DQL(SQL):
 
     """
         'DQL' is a simple extension-class based on MySQLdb, 
@@ -262,11 +177,9 @@ class DQL:
 
     """
 
-    def __repr__(self): return 'MyDQL@MySQLdb'
-
     def __init__(self, db):
-        self.db = db
-        self.maintable = None
+        super(DQL, self).__init__(db)
+        self._table = None
         self._distinct = False
         self._joints = []
         self._groupby = None
@@ -277,35 +190,14 @@ class DQL:
 
     @property
     def fields(self):
-        return self._get_fields()
-
-    def cursor(self):
-        return connect(
-                host=self.db.host,
-                db=self.db.name,
-                user=self.db.user,
-                passwd=self.db.passwd).cursor()
-
-    def _get_fields(self):
         fls = []
-        if self.maintable is not None:
-            fls.extend(self.maintable.iterfieldnames())
+        if self._table is not None:
+            fls.extend(self._table.iterfieldnames())
             for j in self._joints:
                 fls.extend(j.tb.iterfieldnames())
         return tuple(fls)
 
-    def setmain(self, tblname, alias=''):
-        # try:
-        #     assert isinstance(_table, Table)
-        # except AssertionError:
-        #     raise TypeError("%r is not an instance of 'Table'" % _table)
-        # else:
-        tb = getattr(self.db.tables, tblname)
-        tb.set_alias(alias)
-        self.maintable = tb
-        return self
-
-    def get_dql(self, *args, **kwargs):
+    def write(self, *args, **kwargs):
         """
         fields:
             expect a iterable-object contains names of fields to select
@@ -376,9 +268,9 @@ class DQL:
                 j.tb.alias) is True else '{name} ON {rel}'
             tbl.append(
                 f.format(name=j.tb.name, alias=j.tb.alias, rel=j.rel))
-        main_f = '{name} AS {alias}' if self.maintable.alias else '{name}'
+        main_f = '{name} AS {alias}' if self._table.alias else '{name}'
         main = main_f.format(
-            name=self.maintable.name, alias=self.maintable.alias)
+            name=self._table.name, alias=self._table.alias)
         tbl.insert(0, main)
         return method(tbl)
 
@@ -400,7 +292,7 @@ class DQL:
 
     def create_view(self, name, *args, **kwargs):
         self.db.cursor().execute('CREATE OR REPLACE VIEW {name} AS {dql} '.format(
-            name=name, dql=self.get_dql(*args, **kwargs)))
+            name=name, dql=self.write(*args, **kwargs)))
         _view = Table(db=self.db, name=name)
         setattr(self.db, name, _view)
         return _view
@@ -411,12 +303,12 @@ class DQL:
 
     def query(self, *args, **kwargs):
         cursor = self.cursor()
-        cursor.execute(self.get_dql(*args, **kwargs))
+        cursor.execute(self.write(*args, **kwargs))
         return QuerySet(cursor.iterator())
 
     def queryone(self, *args, **kwargs):
         cursor = self.cursor()
-        cursor.execute(self.get_dql(*args, **kwargs))
+        cursor.execute(self.write(*args, **kwargs))
         return cursor.fetchone()
 
     def inner_join(self, tblname, on, alias=''):
@@ -459,3 +351,35 @@ class DQL:
     def limit(self, startpos, count):
         self._limit = startpos, count
         return self
+
+
+class DML(SQL):
+
+    def __init__(self, db):
+        super(DML, self).__init__(db)
+        self._table  = None
+        self._create = []
+        self._update = None
+        self._delete = None
+
+    @property
+    def fields(self):
+        fls = []
+        if self._table is not None:
+            fls.extend(self._table.iterfieldnames())
+        return tuple(fls)
+
+    def insert_value(self, value={}, **kwargs):
+        _value = dictObj.update(kwargs)
+        self._create.append(_value)
+        return self
+
+    def insert_values(self, values):
+        self._create.extend(values)
+        return self
+
+    def write(self):
+        # to wirte sql of demand of `create` or `update` or `delete`
+        components = CREATE or UPDATE or DELETE
+
+        

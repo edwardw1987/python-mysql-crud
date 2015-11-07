@@ -1,22 +1,18 @@
-# coding=utf=8
-# tornado模板
-# {% apply function %} content {% end %}
-# {% raw content %} 不转义 字符串
-# {% escape content %} 转义 字符串
-# {% module xsrf_form_html() %}
-# set_cookie,get_cookie,get_current_user,current_user
-# set_secure_cookie, get_secure_cookie, 
-# xsrf_cookies
-# templates
-# {{ static_url('css/style.css') }}
-# import tornado.autoreload
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @Author: edward
+# @Date:   2015-11-07 14:17:15
+# @Last Modified by:   edward
+# @Last Modified time: 2015-11-07 16:22:51
 import os
 from tornado.web import (
     RequestHandler, Application, url, HTTPError,authenticated)
 from tornado.ioloop import IOLoop
 from tornado.options import define
 import tornado
-from db import mydql
+from db import DB
+# mydml
+
 
 class Handler(RequestHandler):
     def get_argument_into(self, *args, **kwargs):
@@ -25,6 +21,16 @@ class Handler(RequestHandler):
         if into is not None:
             r = into(r)
         return r
+
+class RegisterHandler(Handler):
+    def post(self):
+        username = self.get_argument('username')
+        password = self.get_argument('password')
+        dml = DB.dml()
+        raise Exception(dml.table('user').fields)
+        # dml.table('user').insert_value(username=username, passwd=password)
+        # captcha
+
 
 class OtherHtmlHandler(RequestHandler):
 
@@ -71,7 +77,7 @@ class TestData(Handler):
     def get(self):
         start = self.get_argument_into('startpos', 0, into=int)
         stop = start + self.get_argument_into('count', 10, into=int)
-        results = mydql().setmain('order_table', 'o').limit(11,10).query(fields=['o.order_contact_name']).all()
+        results = mydql().table('student', 'o').limit(0,2).queryset.all()
         self.write({'testdata': results})
 # tornado资源配置
 settings = {
@@ -89,6 +95,7 @@ Application([
     (r'/other/?', OtherHtmlHandler),
     (r'/main/?', MainHanlder),
     (r'/data/?', TestData),
+    (r'/register/?', RegisterHandler),
     ], **settings).listen(8888)
 
 IOLoop.current().start()
