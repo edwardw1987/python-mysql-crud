@@ -1,5 +1,5 @@
 # python-mysql-crud
-python-mysql-crud is intended to make convenient-api for satisfying regular DQL-demand.
+python-mysql-crud is intended to make convenient-api for satisfying regular crud-demand.
 ## hello,world
 <code>from mydql import DataBase</code><br>
 <code>db = DataBase(host='localhost', db='db', user='user', passwd='passwd')</code><br>
