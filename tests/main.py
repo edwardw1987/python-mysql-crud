@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:17:15
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-09 15:29:52
+# @Last Modified time: 2015-11-09 16:35:24
 import os
 from tornado.web import (
     RequestHandler, Application, url, HTTPError,authenticated)
@@ -115,20 +115,28 @@ class AccessCodeHandler(Handler):
         self.write(jsonstr)
 
 def IsTokenExists(code):
-    codeObj = DB.dql().table('code_table', 'c').inner_join('token_table', on="c.code_id=t.token_codeid", alias="t").queryone()
+    codeObj = DB.dql().table('code_table', 'c').\
+            inner_join('token_table', on="c.code_id=t.token_codeid", alias="t").\
+            where(code_access_code=code).queryone()
     return False if codeObj is None else True
 
 def IsValidCode(code):
-    valid = False
+    #  1 code is valid
+    #  0 code is used
+    # -1 code is invalid
+    # -2 code is expired
     access_code = DB.dql().table('code_table').where(code_access_code=code).queryone()
-    if access_code is not None:
+    if access_code is None:
+        return -1
+    else:
         # Any access-code would be expired in 30 mins.
         expires_limit = timedelta(minutes=30)
         now_time = DateTime.now()
         produce_time = access_code['code_produce_time']
         if (now_time - produce_time) <= expires_limit:
-            valid = True
-    return valid
+            return (not IsTokenExists(code) and 1 or 0)
+        else:
+            return -2
 
 def IsValidClient(client_id, client_secret):
     return (CLIENT_SECRETS.get(client_id) == client_secret)
@@ -138,9 +146,10 @@ class AccessTokenHanler(Handler):
         client_id = self.get_argument_into('client_id', None)
         client_secret = self.get_argument_into('client_secret', None)
         code = self.get_argument_into('code', None)
-        code_id = DB.dql().table('code_table').where(code_access_code=code).queryone()['code_id']
-        response = {"result": 0}
-        if IsValidCode(code) and IsValidClient(client_id, client_secret) and not IsTokenExists(code):
+        validateCode = IsValidCode(code)
+        if validateCode == True and IsValidClient(client_id, client_secret):
+            codeObj = DB.dql().table('code_table').where(code_access_code=code).queryone()
+            code_id = codeObj and codeObj['code_id']
             access_token, refresh_token = produce_token(code, client_id, client_secret)
             DB.dml().table('token_table').insert({
                                     "token_codeid": code_id,
@@ -150,6 +159,8 @@ class AccessTokenHanler(Handler):
                                     "access_token": access_token,
                                     "refresh_token": refresh_token,
                                     "expires_in":3600, }}
+        else:
+            response = {'result': validateCode  }
         jsonstr = json.dumps(response)
         self.set_header('Content-Type','application/json')
         self.write(jsonstr)
