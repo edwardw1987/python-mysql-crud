@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-08 00:11:35
+# @Last Modified time: 2015-11-09 14:06:49
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -330,12 +330,16 @@ class DQL(SQL):
         self._groupby = key and key(field) or field
         return self
 
-    def having(self, dictObj):
-        self._having = Condition(dictObj).clause()
+    def having(self, dictObj={}, **kwargs):
+        _dictObj = dictObj.copy()
+        _dictObj.update(kwargs)
+        self._having = Condition(_dictObj).clause()
         return self
 
-    def where(self, dictObj):
-        self._where = Condition(dictObj).clause()
+    def where(self, dictObj={}, **kwargs):
+        _dictObj = dictObj.copy()
+        _dictObj.update(**kwargs)
+        self._where = Condition(_dictObj).clause()
         return self
 
     def orderby(self, field, desc=False, key=None):
@@ -382,8 +386,10 @@ class DML(SQL):
         cursor = self.cursor()
         cursor.execute(self.write('delete'))
 
-    def insert(self, **kwargs):
-        self.value(**kwargs)
+    def insert(self, dictObj={}, **kwargs):
+        _dictObj = dictObj.copy()
+        _dictObj.update(kwargs)
+        self.value(**_dictObj)
         cursor = self.cursor()
         cursor.execute(self.write('insert'))
         return self
@@ -396,7 +402,9 @@ class DML(SQL):
     #     return self
 
     def update(self, **kwargs):
-        self.value(**kwargs)
+        _dictObj = dictObj.copy()
+        _dictObj.update(kwargs)
+        self.value(**_dictObj)
         cursor = self.cursor()
         cursor.execute(self.write('update'))
         return self
