@@ -3,16 +3,21 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-06 11:32:55
+# @Last Modified time: 2015-11-10 17:29:26
 from MySQLdb.cursors import DictCursor
 from MySQLdb.connections import Connection
+from random import randint
 
-
-def sortit(iterable, key=None, reverse=False, conv=iter):
+def sortit(iterable, key=None, reverse=False, reverse_key=None, conv=iter):
     """
     An alternative to 'sorted' which returns a sorted-iterator instead of a list.
+    if 'reverse' is True, 'reverse_key' will be ignored.
     """
-    return conv(sorted(iterable, key=key, reverse=reverse))
+    if (reverse is False) and hasattr(reverse_key, '__call__'):
+        _rev = reverse_key()
+    else:
+        _rev = reverse
+    return conv(sorted(iterable, key=key, reverse=_rev))
 
 
 def connect(**kwargs):
