@@ -2,15 +2,15 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
-# @Last Modified by:   edward
-# @Last Modified time: 2015-11-10 17:29:26
+# @Last Modified by:   python
+# @Last Modified time: 2015-11-10 18:35:50
 from MySQLdb.cursors import DictCursor
 from MySQLdb.connections import Connection
-from random import randint
 
 def sortit(iterable, key=None, reverse=False, reverse_key=None, conv=iter):
     """
     An alternative to 'sorted' which returns a sorted-iterator instead of a list.
+    'reverse_key' defaults to 'None' & expects for a function which returns Ture(1) or False(0)
     if 'reverse' is True, 'reverse_key' will be ignored.
     """
     if (reverse is False) and hasattr(reverse_key, '__call__'):
