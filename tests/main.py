@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:17:15
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-10 16:14:12
+# @Last Modified time: 2015-11-11 18:00:33
 import os
 from tornado.web import (
     RequestHandler, Application, url, HTTPError,authenticated)
@@ -12,9 +12,10 @@ from tornado.options import define
 import tornado
 from db import DB
 from datetime import datetime as DateTime, timedelta
-import time, random
+import time
+from random import randint, shuffle
+from hashlib import md5
 import json
-import hashlib
 
 # mydml
 CLIENT_SECRETS = {'ios':'9e304d4e8df1b74cfa009913198428ab'}
@@ -23,18 +24,37 @@ def getuniquestring():
     randstr = str(time.time()).replace(".", "")[4:]
     while len(randstr) < 8:
         randstr += "0"
-    randstr += str(random.randint(10, 99))
+    randstr += str(randint(10, 99))
     return randstr
 
-def produce_token(code):
-    _el = [code, client_id, client_secret]
-    _access = 'access'.join(_el)
-    _access_toke = hashlib.md5(_access).hexdigest()
-    _refresh = 'refresh'.join(_el)
-    _refresh_token = hashlib.md5(_refresh).hexdigest()
-    return _access_toke, _refresh_token
+def _produce_token(code, secret):
+    ls = []
+    ls.extend(code)
+    ls.extend(secret)
+    shuffle(ls)
+    return md5(secret.join(ls)).hexdigest()
+
+def produce_tokens(code):
+    return produce_access_token(code), produce_refresh_token(code) 
+
+def produce_access_token(code):
+    return _produce_token(code, 'access')
+
+def produce_refresh_token(code):
+    return _produce_token(code, 'refresh')
+
 
 class Handler(RequestHandler):
+
+    def __init__(self, *args, **kwargs):
+        super(Handler, self).__init__(*args, **kwargs)
+        self._backend_token = self._handle_backendtoken()
+
+    def check_user_token(self):
+        res = None
+        if self.is_user:
+            res = self.check_token()
+        return res
 
     @property
     def is_user(self):
@@ -42,31 +62,58 @@ class Handler(RequestHandler):
         user_id = self.get_argument('user_id', None)
         return False if user_id is None else True
 
-    def refresh_token(self):
-        pass
-
-    @staticmethod
-    def _check_token(token):
-        pass
-
-    def _get_tokens(self):
-        access = self.get_argument('access_token', None)
-        refresh = self.get_argument('refresh_token', None)
+    @property
+    def tokens(self):
         auth = self.request.headers.get('authorization')
-        access = not access and auth and auth.get('access_token')
-        refresh = not refresh and auth and auth.get('refresh_token')
+        access = self.get_argument('access_token', None) or (auth and auth.get('access_token'))
+        refresh = self.get_argument('refresh_token', None) or (auth and auth.get('refresh_token'))
         return access, refresh
 
-    def check_token(self):
-        #  1 valid
-        #  0 
-        # -1
 
-        token = self.get_argument('token', None) or self.request.headers.get('token')
-        if token is None:
+    def check_token(self):
+       #  1: 'valid'
+       #  0: 'expired'
+       # -1: 'invalid'
+       # -2: 'missing'
+        if all(self.tokens) is False:
             return -2
-        else:
-            return 1
+        if self.backendtoken_matched is False:
+            return -1
+        if self.backendtoken_expired(minutes=1):
+            return  0
+        return 1
+
+    def _handle_backendtoken(self):
+        access, refresh = self.tokens
+        row = DB.dql().table('token_table', alias='t')\
+            .inner_join('code_table', on='t.token_codeid=c.code_id', alias='c')\
+            .where({
+                'token_access_token': access,
+                'token_refresh_token': refresh,
+            }).queryone()
+        return row
+
+    @property
+    def backendtoken_matched(self):
+        return False if self._backend_token is None else True
+
+    def backendtoken_expired(self, **kwargs):
+        assert self.backendtoken_matched, "token doesn't exist"
+        expires_limit = timedelta(**kwargs)
+        now_time = DateTime.now()
+        trt = self._backend_token['token_refresh_time']
+        return (now_time - trt) > expires_limit
+        
+
+    def refresh_token(self):
+        token = self._backend_token
+        assert token, "token doesn't exist"
+        code = token['code_access_code']
+        access, _ = produce_tokens(code)
+        DB.dml().table('token_table').where(token_id=token['token_id'])\
+        .update({"token_refresh_time": DateTime.strftime(DateTime.now(), "%Y-%m-%d %H:%M:%S"),
+                "token_access_token": access })
+        return access, token['token_refresh_token']
 
     def get_argument_into(self, *args, **kwargs):
         into = kwargs.pop('into', None)
@@ -150,7 +197,7 @@ class AccessCodeHandler(Handler):
         self.set_header('Content-Type','application/json')
         self.write(jsonstr)
 
-def IsTokenExists(code):
+def IsTokenExistsByCode(code):
     codeObj = DB.dql().table('code_table', 'c').\
             inner_join('token_table', on="c.code_id=t.token_codeid", alias="t").\
             where(code_access_code=code).queryone()
@@ -170,7 +217,7 @@ def IsValidCode(code):
         now_time = DateTime.now()
         produce_time = access_code['code_produce_time']
         if (now_time - produce_time) <= expires_limit:
-            return (not IsTokenExists(code) and 1 or 0)
+            return (not IsTokenExistsByCode(code) and 1 or 0)
         else:
             return -2
 
@@ -186,15 +233,15 @@ class AccessTokenHandler(Handler):
         if validateCode == True and IsValidClient(client_id, client_secret):
             codeObj = DB.dql().table('code_table').where(code_access_code=code).queryone()
             code_id = codeObj and codeObj['code_id']
-            access_token, refresh_token = produce_token(code)
+            access, refresh = produce_tokens(code)
             DB.dml().table('token_table').insert({
                                     "token_codeid": code_id,
-                                    'token_access_token': access_token,
-                                    'token_refresh_token': refresh_token})
+                                    'token_access_token': access,
+                                    'token_refresh_token': refresh})
             response = {"result":1, "token": {
-                                    "access_token": access_token,
-                                    "refresh_token": refresh_token,
-                                    "expires_in":3600, }}
+                                    "access_token": access,
+                                    "refresh_token": refresh,
+                                    "expires_in": 3600, }}
         else:
             response = {'result': validateCode  }
         jsonstr = json.dumps(response)
@@ -206,11 +253,22 @@ class VerifyTokenHandler(Handler):
     use to verify if token is valid only while app's launching 
     """
     def get(self):
-        token = self.get_argument('token', None)
-        client_id = self.get_argument('client_id', None)
-        client_secret = self.get_argument('client_secret', None)
-
-        response = {"result": 0}
+        token_signal = self.check_user_token()
+        if token_signal is None:
+            # not user but tourist
+            response = {"result": 'response something for tourists'}
+        elif token_signal == 0:
+            # token expired
+            # automatically update 'access_token' by 'refresh_token'
+            a, r = self.refresh_token()
+            response = {'result':1 , 'token':{'access_token': a, 'refresh_token': r, 'expires_in': 3600}}
+        elif token_signal == 1:
+            # valid
+            response = {"result": token_signal}
+        else:
+            # invalid, missing
+            response = {"result": token_signal}
+      
         jsonstr = json.dumps(response)
         self.set_header('Content-Type','application/json')
         self.write(jsonstr)

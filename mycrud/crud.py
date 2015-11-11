@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-09 14:06:49
+# @Last Modified time: 2015-11-11 17:22:14
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -401,7 +401,7 @@ class DML(SQL):
     #         self._values.append(values)
     #     return self
 
-    def update(self, **kwargs):
+    def update(self, dictObj={}, **kwargs):
         _dictObj = dictObj.copy()
         _dictObj.update(kwargs)
         self.value(**_dictObj)
