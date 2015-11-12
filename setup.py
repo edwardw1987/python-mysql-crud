@@ -3,11 +3,11 @@ from distutils.core import setup
 setup(
 	name='mycrud',
 	version='0.1.1',
-	description='python-mysql-crud',
+	description='python2-mysql-crud',
 	long_description=open('README.rst').read(),
 	author='Edward Wang',
 	author_email='edwardw@qq.com',
-	url='https://github.com/edwardw1987/python-mysql-crud',
+	url='https://github.com/edwardw1987/python2-mysql-crud',
 	packages=['mycrud']
 
 )
