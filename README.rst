@@ -1,5 +1,5 @@
 
-Hello,world：
+**Hello, world**
 
 .. code-block:: python
 
@@ -7,8 +7,9 @@ Hello,world：
   db = DataBase(host='localhost', name='db', user='user', passwd='passwd')
   rows = db.dql().table('tablename').queryset.all()
 
-Feature
-chaining-call:
+**Features**
+
+*1. chaining-call*
 
 .. code-block:: python
 
