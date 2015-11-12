@@ -3,16 +3,10 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-12 16:52:40
-try:
-    from MySQLdb.cursors import DictCursor #py2
-except ImportError:
-    from pymysql.cursors import DictCursor #py3
+# @Last Modified time: 2015-11-12 17:13:13
+from MySQLdb.cursors import DictCursor 
+from MySQLdb.connections import Connection 
 
-try:
-    from MySQLdb.connections import Connection #py2 
-except ImportError:
-    from pymysql.connections import Connection #py3
 
 def sortit(iterable, key=None, reverse=False, conv=iter):
     """
