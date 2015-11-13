@@ -2,13 +2,12 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
-# @Last Modified by:   edward
-# @Last Modified time: 2015-11-12 23:29:26
+# @Last Modified by:   python
+# @Last Modified time: 2015-11-13 14:13:07
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
 from .utils import connect, dedupe
-
 
 class Joint:
 
@@ -144,7 +143,11 @@ class SQL:
     def __init__(self, db):
         super(SQL, self).__init__()
         self.db = db
+        self.reset()
+
+    def reset(self):
         self._connection = None
+        self._table = None
 
     def connect(self):
         conn = connect(
@@ -159,15 +162,21 @@ class SQL:
         return self.connect().cursor()
 
     def commit(self):
-        return self._connection.commit()
+        conn = self._connection
+        return conn and conn.commit()
 
     def rollback(self):
-        return self._connection.rollback()
+        conn = self._connection
+        return conn and conn.rollback()
 
     def table(self, tblname, alias=''):
-        tb = getattr(self.db.tables, tblname)
-        tb.set_alias(alias)
-        self._table = tb
+        try:
+            tb = getattr(self.db.tables, tblname)
+        except AttributeError:
+            raise ValueError('invalid table name %r' % tblname)
+        else:
+            tb.set_alias(alias)
+            self._table = tb
         return self
 
     @property
@@ -177,6 +186,21 @@ class SQL:
     def write(self):
         pass
 
+    @property
+    def is_valid(self):
+        try:
+            self.validate()
+        except ValueError:
+            return False
+        else:
+            return True
+
+    def validate(self):
+        from .database import Table
+        try:
+            assert isinstance(self._table, Table)
+        except AssertionError:
+            raise ValueError('%r is not a valid instance of Table' % self._table)
 
 INNER_JOIN = lambda tbl: ' INNER JOIN '.join(tbl)
 
@@ -190,7 +214,10 @@ class DQL(SQL):
 
     def __init__(self, db):
         super(DQL, self).__init__(db)
-        self._table = None
+        self.reset()
+
+    def reset(self):
+        super(DQL, self).reset()
         self._distinct = False
         self._joints = []
         self._groupby = None
@@ -230,6 +257,7 @@ class DQL(SQL):
         # having
         # union
         # not
+        super(DQL, self).validate()
         ks = kwargs
         SELECT     = 'SELECT'
         DISTINCT   = self._handle_distinct()
@@ -365,7 +393,10 @@ class DML(SQL):
 
     def __init__(self, db):
         super(DML, self).__init__(db)
-        self._table  = None
+        self.reset()
+
+    def reset(self):
+        super(DML, self).reset()
         self._value = None
         self._values = []
         self._where  = None
@@ -417,6 +448,7 @@ class DML(SQL):
     def write(self, key):
         # to write sql for operation of `insert` or `update` or `delete`
         # key str `insert/create`, `update`, `delete`
+        self.validate()
         DICT = dict(INSERT = 'INSERT INTO',
                     UPDATE = 'UPDATE',
                     DELETE = 'DELETE FROM',)
