@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
-# @Last Modified by:   python
-# @Last Modified time: 2015-11-13 14:13:07
+# @Last Modified by:   edward
+# @Last Modified time: 2015-11-13 15:25:22
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
 from .utils import connect, dedupe
+import sys
 
 class Joint:
 
@@ -84,8 +85,12 @@ class Condition:
         value = self.dict[key]
         # ckey is equivalent to fieldname
         # access corresponding table by fieldname
-
-        if isinstance(value, str):
+        v = sys.version_info[0]
+        if v == 2:
+            string = basestring
+        elif v == 3:
+            string = str
+        if isinstance(value, string):
             token = token % '"%s"'
         elif isinstance(value, (tuple, list)):
             if tail in ('in',):
