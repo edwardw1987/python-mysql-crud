@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:17:15
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-12 23:25:36
+# @Last Modified time: 2015-11-13 11:40:53
 import os
 from tornado.web import (
     RequestHandler, Application, url, HTTPError,authenticated)
@@ -48,7 +48,7 @@ class Handler(RequestHandler):
 
     def __init__(self, *args, **kwargs):
         super(Handler, self).__init__(*args, **kwargs)
-        # self._backend_token = self._handle_backendtoken()
+        self._backend_token = self._handle_backendtoken()
 
     def check_user_token(self):
         res = None
