@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 11:46:16
+# @Last Modified time: 2015-11-14 11:55:28
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -357,12 +357,12 @@ class DQL(SQL):
         """
         pattern = re.compile(r'[\w]+(?:[.])[\w]+')
         if pattern.match(field):
-            return 2
-        else:
             if '.' in field:
-                raise ValueError('invalid field name %r' % field)
+                return 2
             else:
                 return 1
+        else:
+            raise ValueError('invalid field name %r' % field)
 
     def having(self, dictObj={}, **kwargs):
         _dictObj = dictObj.copy()
