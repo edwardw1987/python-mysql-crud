@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 14:36:42
+# @Last Modified time: 2015-11-14 15:11:58
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -345,22 +345,6 @@ class DQL(SQL):
         tb.set_alias(alias)
         self._joints.append(Joint(tb,on))
         return self
-
-    @staticmethod
-    def validate_field(field):
-        """
-        field str 
-        2 fullname
-        1 shortname
-        """
-        pattern = re.compile(r'[\w]+(?:[.])[\w]+')
-        if pattern.match(field):
-            if '.' in field:
-                return 2
-            else:
-                return 1
-        else:
-            raise ValueError('invalid field name %r' % field)
 
     def where(self, dictObj={}, **kwargs):
         _dictObj = dictObj.copy()
