@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 15:11:58
+# @Last Modified time: 2015-11-14 16:20:40
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -205,7 +205,7 @@ class SQL:
         else:
             return True
 
-    def validate(self, table=''):
+    def validate(self):
         from .database import Table
         try:
             assert isinstance(self._table, Table)
