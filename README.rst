@@ -17,3 +17,4 @@
     .inner_join('tableB', on='A.id=B.aid', alias='B')\
     .inner_join('tableC', on='B.cid=C.id', alias='C')\
     .queryset.slice(0,10)
+*example*
