@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 11:55:28
+# @Last Modified time: 2015-11-14 12:24:02
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -226,7 +226,6 @@ class DQL(SQL):
         self._joints = []
         self._orderbys = []
         self._where = None
-        self._having = None
         self._limit = None
 
     def itertables(self):
@@ -271,12 +270,11 @@ class DQL(SQL):
         FROM       = 'FROM'
         TABLES     = self._handle_tables(method=INNER_JOIN)
         WHERE      = self._handle_where()
-        HAVING     = self._handle_having()
         ORDER_BY   = self._handle_orderby()
         LIMIT      = self._handle_limit()
         components = [ k for k in (
             SELECT, DISTINCT, FIELDS, FROM, TABLES,
-            WHERE, GROUP_BY, HAVING, ORDER_BY, LIMIT) if k is not None]
+            WHERE, ORDER_BY, LIMIT) if k is not None]
         return ' '.join(components)
 
     def _handle_limit(self):
@@ -284,9 +282,6 @@ class DQL(SQL):
 
     def _handle_where(self):
         return ('WHERE %s' % self._where) if self._where else None  
-
-    def _handle_having(self):
-        return ('HAVING %s' % self._having) if self._having else None
 
     def _handle_distinct(self):
         return 'DISTINCT' if self._distinct else None
@@ -363,12 +358,6 @@ class DQL(SQL):
                 return 1
         else:
             raise ValueError('invalid field name %r' % field)
-
-    def having(self, dictObj={}, **kwargs):
-        _dictObj = dictObj.copy()
-        _dictObj.update(kwargs)
-        self._having = Condition(_dictObj).clause()
-        return self
 
     def where(self, dictObj={}, **kwargs):
         _dictObj = dictObj.copy()
