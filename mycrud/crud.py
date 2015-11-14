@@ -3,12 +3,11 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 10:07:22
+# @Last Modified time: 2015-11-14 11:46:16
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
 from .utils import connect, dedupe
-from copy import deepcopy
 import sys
 import re
 
@@ -176,14 +175,18 @@ class SQL:
         conn = self._connection
         return conn and conn.rollback()
 
-    def table(self, tblname, alias=''):
+    def _access_table(self, name):
         try:
-            tb = deepcopy(getattr(self.db.tables, tblname))
+            tb = getattr(self.db.tables, name)
         except AttributeError:
-            raise ValueError('invalid table name %r' % tblname)
+            raise ValueError('invalid table name %r' % name)
         else:
-            tb.set_alias(alias)
-            self._table = tb
+            return tb
+
+    def table(self, tblname, alias=''):
+        tb = self._access_table(tblname)
+        tb.set_alias(alias)
+        self._table = tb
         return self
 
     @property
@@ -202,11 +205,7 @@ class SQL:
         else:
             return True
 
-    def validate_table(self, table=''):
-        """
-        check if all valid table in container
-        if 'table' is not given, iterate over '_table' and '_joints' to check
-        """
+    def validate(self, table=''):
         from .database import Table
         try:
             assert isinstance(self._table, Table)
@@ -225,7 +224,6 @@ class DQL(SQL):
         super(DQL, self).reset()
         self._distinct = False
         self._joints = []
-        self._groupby = None
         self._orderbys = []
         self._where = None
         self._having = None
@@ -273,7 +271,6 @@ class DQL(SQL):
         FROM       = 'FROM'
         TABLES     = self._handle_tables(method=INNER_JOIN)
         WHERE      = self._handle_where()
-        GROUP_BY   = self._handle_groupby()
         HAVING     = self._handle_having()
         ORDER_BY   = self._handle_orderby()
         LIMIT      = self._handle_limit()
@@ -293,12 +290,6 @@ class DQL(SQL):
 
     def _handle_distinct(self):
         return 'DISTINCT' if self._distinct else None
-
-    def _handle_groupby(self):
-        if self._groupby is None:
-            return 
-        else:
-            return 'GROUP BY %s' % self._groupby
 
     def _handle_orderby(self):
         obs = self._orderbys
@@ -352,49 +343,26 @@ class DQL(SQL):
         return cursor.fetchone()
 
     def inner_join(self, tblname, on, alias=''):
-        tb = deepcopy(getattr(self.db.tables, tblname))
+        tb = self._access_table(tblname)
         tb.set_alias(alias)
         self._joints.append(Joint(tb,on))
         return self
 
-    def validate_field(self, field):
-        # field str 
-        # 2 fullname
-        # 1 shortname
-        # 0 valid
-        _pat = re.compile(r'[\w]+[.][\w]+')
-        if _pat.match(field):
+    @staticmethod
+    def validate_field(field):
+        """
+        field str 
+        2 fullname
+        1 shortname
+        """
+        pattern = re.compile(r'[\w]+(?:[.])[\w]+')
+        if pattern.match(field):
             return 2
         else:
             if '.' in field:
-                return 0
+                raise ValueError('invalid field name %r' % field)
             else:
                 return 1
-
-    def groupby(self, field, key=None):
-        """
-        field: str, name of field, e.g. 'tablename.fieldname' or 'fieldname'
-        if the latter is given, iterate over table and joints & group by the first matched fieldname
-        defaults to group by field, if key is given then group by value key(field) returns
-        """
-        fs = field.split('.')
-        lng = len(fs)        
-        tbl = [f.tb for j in self._joints]
-        tbl.insert(0, self._table)
-        if lng == 1:
-            for tb in tbl:
-                fn = fs[-1]    
-                if fn in tb.fields:
-                    tb.fields[fn].group_concat()
-                    break
-                else:
-                    continue
-        elif lng == 2:
-            for tb in tbl:
-                tn, fn = fs       
-
-        self._groupby = key and key(field) or field
-        return self
 
     def having(self, dictObj={}, **kwargs):
         _dictObj = dictObj.copy()

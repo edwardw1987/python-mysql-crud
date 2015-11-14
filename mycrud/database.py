@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 09:28:01
+# @Last Modified time: 2015-11-14 11:13:07
 __metaclass__ = type
 from .utils import connect, Storage
 from .crud import DQL, DML
@@ -119,10 +119,3 @@ class Field:
             alias or self.name)
         self._mutation = mut
         return mut
-
-    def group_concat(self, alias=''):
-        mut = 'GROUP_CONCAT(%s) AS %s' % (
-            self.fullname,
-            alias or self.name)
-        return mut
-    
