@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 16:20:40
+# @Last Modified time: 2015-11-14 21:41:01
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -106,9 +106,15 @@ class Condition:
         return ' AND '.join(self.get_fraction(key) for key in self.dict.keys())
 
 class QuerySet:
-
+    """
+        QuerySet receives a iterable-object
+    """
     def __init__(self, iterator):
         self.iterator = iterator
+
+    def __iter__(self):
+        for i in self.iterator:
+            yield i
 
     def groupby(self, fieldname):
         _dict = {}
@@ -119,7 +125,7 @@ class QuerySet:
             _dict[k].append(i)
         return _dict
 
-    def orderby(self, field, desc=False):
+    def sortby(self, field, desc=False):
         ls = list(self.iterator)
         ls.sort(key=itemgetter(field), reverse=desc)
         self.iterator = iter(ls)
@@ -136,13 +142,15 @@ class QuerySet:
             return tuple(vg)
 
     def all(self):
-        return tuple(self.iterator)
+        return tuple(self)
 
     def slice(self, start, stop, step=1):
         """
+        don't consume
         start, stop, step
         """
         return tuple( i for i in islice(self.iterator, start, stop, step))
+
 
 class SQL:
 

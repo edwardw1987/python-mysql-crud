@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 15:49:30
+# @Last Modified time: 2015-11-14 21:29:13
 try:
     from pymysql.cursors import DictCursor 
     from pymysql.connections import Connection 
@@ -39,12 +39,19 @@ def dedupe(items):
 class Cursor(DictCursor):
 
     def iterator(self):
-        while 1:
-            r = self.fetchone()
-            if r is None:
-                break
-            else:
-                yield r
+        return Iterator(self)
+
+
+class Iterator:
+
+    def __init__(self, cursor):
+        self.cursor = cursor
+
+    def consume(self):
+        return self.cursor.fetchone()
+
+    def __iter__(self):
+        return iter(self.consume, None)
 
 
 class Storage(dict):
