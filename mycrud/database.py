@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 11:13:07
+# @Last Modified time: 2015-11-14 14:35:56
 __metaclass__ = type
 from .utils import connect, Storage
 from .crud import DQL, DML
@@ -59,11 +59,14 @@ class DataBase:
         for table in self.IterTable(fieldname):
             yield table.fields[fieldname]
 
+    @property
     def dql(self):
         return DQL(self)
 
+    @property
     def dml(self):
         return DML(self)
+
 
 class Table:
 
@@ -93,7 +96,12 @@ class Table:
         return '<type: %r, name: %r, alias: %r>' % (self.__class__.__name__, self.name, self.alias)
 
     def set_alias(self, alias):
-        self.alias = alias
+        try:
+            assert isinstance(alias, str) and len(alias) > 0
+        except AssertionError:
+            raise ValueError('invalid Table alias %r' % alias)
+        else:
+            self.alias = alias
 
 class Field:
 

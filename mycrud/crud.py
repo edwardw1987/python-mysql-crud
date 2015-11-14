@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 12:24:02
+# @Last Modified time: 2015-11-14 14:36:42
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
@@ -183,8 +183,8 @@ class SQL:
         else:
             return tb
 
-    def table(self, tblname, alias=''):
-        tb = self._access_table(tblname)
+    def table(self, tblname, alias):
+        tb = self._access_table(tblname)      
         tb.set_alias(alias)
         self._table = tb
         return self
@@ -212,7 +212,8 @@ class SQL:
         except AssertionError:
             raise ValueError('%r is not a valid instance of Table' % self._table)
 
-INNER_JOIN = lambda tbl: ' INNER JOIN '.join(tbl)
+INNER_JOIN  = lambda tbl: ' INNER JOIN '.join(tbl)
+DATE_FORMAT = lambda fmt: lambda f: 'DATE_FORMAT(%s, ' % f + '"%s")' % fmt
 
 class DQL(SQL):
 
@@ -244,7 +245,7 @@ class DQL(SQL):
         """
         fields:
             expect a iterable-object contains names of fields to select
-            each name of field is expected to be in format 'table.field' or 'table_alias.field' if table_alias has been set. 
+            each name of field is expected to be in format 'table_alias.field'
             if not given, defaults to 'self.fields' 
         excludes:
             expect a iterable-object contains names of fields to exclude among 'self.fields'
@@ -297,14 +298,16 @@ class DQL(SQL):
     def _handle_tables(self, method):
         tbl = []
         for j in self._joints:
-            f = '{name} AS {alias} ON {rel}' if bool(
-                j.tb.alias) is True else '{name} ON {rel}'
             tbl.append(
-                f.format(name=j.tb.name, alias=j.tb.alias, rel=j.rel))
-        main_f = '{name} AS {alias}' if self._table.alias else '{name}'
-        main = main_f.format(
-            name=self._table.name, alias=self._table.alias)
-        tbl.insert(0, main)
+                '{name} AS {alias} ON {rel}'.format(
+                    name=j.tb.name,
+                    alias=j.tb.alias,
+                    rel=j.rel)
+                )
+        tb = '{name} AS {alias}'.format(
+            name=self._table.name,
+            alias=self._table.alias)
+        tbl.insert(0, tb)
         return method(tbl)
 
     def _handle_fields(self, fields, excludes):
@@ -337,7 +340,7 @@ class DQL(SQL):
         cursor.execute(self.write(*args, **kwargs))
         return cursor.fetchone()
 
-    def inner_join(self, tblname, on, alias=''):
+    def inner_join(self, tblname, on, alias):
         tb = self._access_table(tblname)
         tb.set_alias(alias)
         self._joints.append(Joint(tb,on))
@@ -380,8 +383,11 @@ class DQL(SQL):
         self._distinct = True
         return self
 
-    def limit(self, startpos, count):
-        self._limit = startpos, count
+    def limit(self, startpos=0, count=0):
+        if startpos > 0 and count == 0:
+            self._limit = 0, startpos
+        elif startpos >= 0 and count > 0:
+            self._limit = startpos, count
         return self
 
 
