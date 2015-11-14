@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-12 22:59:33
+# @Last Modified time: 2015-11-14 09:28:01
 __metaclass__ = type
 from .utils import connect, Storage
 from .crud import DQL, DML
@@ -112,7 +112,7 @@ class Field:
     def mutation(self):
         return self._mutation
 
-    def DateFormat(self, fmt, alias=''):
+    def date_format(self, fmt, alias=''):
         mut = 'DATE_FORMAT(%s, %r) AS %s' % (
             self.fullname,
             fmt,
@@ -120,7 +120,7 @@ class Field:
         self._mutation = mut
         return mut
 
-    def GroupConcat(self, alias=''):
+    def group_concat(self, alias=''):
         mut = 'GROUP_CONCAT(%s) AS %s' % (
             self.fullname,
             alias or self.name)

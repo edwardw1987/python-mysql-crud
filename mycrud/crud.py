@@ -3,12 +3,14 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-13 15:25:22
+# @Last Modified time: 2015-11-14 10:07:22
 __metaclass__ = type
 from itertools import islice
 from operator import itemgetter
 from .utils import connect, dedupe
+from copy import deepcopy
 import sys
+import re
 
 class Joint:
 
@@ -176,7 +178,7 @@ class SQL:
 
     def table(self, tblname, alias=''):
         try:
-            tb = getattr(self.db.tables, tblname)
+            tb = deepcopy(getattr(self.db.tables, tblname))
         except AttributeError:
             raise ValueError('invalid table name %r' % tblname)
         else:
@@ -200,7 +202,11 @@ class SQL:
         else:
             return True
 
-    def validate(self):
+    def validate_table(self, table=''):
+        """
+        check if all valid table in container
+        if 'table' is not given, iterate over '_table' and '_joints' to check
+        """
         from .database import Table
         try:
             assert isinstance(self._table, Table)
@@ -210,12 +216,6 @@ class SQL:
 INNER_JOIN = lambda tbl: ' INNER JOIN '.join(tbl)
 
 class DQL(SQL):
-
-    """
-        'DQL' is a simple extension-class based on MySQLdb, 
-        which is intended to make convenient-api for satisfying regular DQL-demand.
-
-    """
 
     def __init__(self, db):
         super(DQL, self).__init__(db)
@@ -231,13 +231,16 @@ class DQL(SQL):
         self._having = None
         self._limit = None
 
+    def itertables(self):
+        yield self._table
+        for j in self._joints:
+            yield j.tb
+
     @property
     def fields(self):
         fls = []
-        if self._table is not None:
-            fls.extend(self._table.iterfieldnames())
-            for j in self._joints:
-                fls.extend(j.tb.iterfieldnames())
+        for tb in self.itertables():
+            fls.extend(tb.iterfieldnames())
         return tuple(fls)
 
     def write(self, *args, **kwargs):
@@ -349,16 +352,47 @@ class DQL(SQL):
         return cursor.fetchone()
 
     def inner_join(self, tblname, on, alias=''):
-        tb = getattr(self.db.tables, tblname)
+        tb = deepcopy(getattr(self.db.tables, tblname))
         tb.set_alias(alias)
         self._joints.append(Joint(tb,on))
         return self
 
+    def validate_field(self, field):
+        # field str 
+        # 2 fullname
+        # 1 shortname
+        # 0 valid
+        _pat = re.compile(r'[\w]+[.][\w]+')
+        if _pat.match(field):
+            return 2
+        else:
+            if '.' in field:
+                return 0
+            else:
+                return 1
+
     def groupby(self, field, key=None):
         """
-        field: str, name of field
+        field: str, name of field, e.g. 'tablename.fieldname' or 'fieldname'
+        if the latter is given, iterate over table and joints & group by the first matched fieldname
         defaults to group by field, if key is given then group by value key(field) returns
         """
+        fs = field.split('.')
+        lng = len(fs)        
+        tbl = [f.tb for j in self._joints]
+        tbl.insert(0, self._table)
+        if lng == 1:
+            for tb in tbl:
+                fn = fs[-1]    
+                if fn in tb.fields:
+                    tb.fields[fn].group_concat()
+                    break
+                else:
+                    continue
+        elif lng == 2:
+            for tb in tbl:
+                tn, fn = fs       
+
         self._groupby = key and key(field) or field
         return self
 
