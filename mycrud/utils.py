@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
-# @Last Modified by:   python
-# @Last Modified time: 2015-11-13 12:55:58
+# @Last Modified by:   edward
+# @Last Modified time: 2015-11-14 15:49:30
 try:
     from pymysql.cursors import DictCursor 
     from pymysql.connections import Connection 
@@ -23,7 +23,7 @@ def connect(**kwargs):
     """
     A wrapped function based on 'MySQLdb.connections.Connection' returns a 'Connection' instance.
     """
-    kwargs['cursorclass'] = kwargs.pop('cursorclass', None) or DQLCursor
+    kwargs['cursorclass'] = kwargs.pop('cursorclass', None) or Cursor
     kwargs['charset'] = kwargs.pop('charset', None) or 'utf8'
     return Connection(**kwargs)
 
@@ -36,7 +36,7 @@ def dedupe(items):
             seen.add(item)
 
 
-class DQLCursor(DictCursor):
+class Cursor(DictCursor):
 
     def iterator(self):
         while 1:
