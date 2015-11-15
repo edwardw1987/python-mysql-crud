@@ -3,9 +3,9 @@
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-15 18:45:52
+# @Last Modified time: 2015-11-15 20:11:38
 __metaclass__ = type
-from .utils import connect, Storage
+from .utils import connect, Storage, StringType
 from .crud import DQL, DML
 
 
@@ -97,7 +97,7 @@ class Table:
 
     def set_alias(self, alias):
         try:
-            assert isinstance(alias, str) and len(alias) > 0
+            assert isinstance(alias, StringType) and len(alias) > 0
         except AssertionError:
             raise ValueError('invalid Table alias %r' % alias)
         else:

@@ -3,10 +3,10 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-15 18:47:05
+# @Last Modified time: 2015-11-15 20:12:29
 __metaclass__ = type
-from .utils import connect
-import sys
+from .utils import connect, StringType
+from copy import deepcopy
 
 
 class Joint:
@@ -84,12 +84,8 @@ class Condition:
         value = self.dict[key]
         # ckey is equivalent to fieldname
         # access corresponding table by fieldname
-        v = sys.version_info[0]
-        if v == 2:
-            string = basestring
-        elif v == 3:
-            string = str
-        if isinstance(value, string):
+
+        if isinstance(value, StringType):
             token = token % '"%s"'
         elif isinstance(value, (tuple, list)):
             if tail in ('in',):
@@ -141,9 +137,11 @@ class SQL:
         except AttributeError:
             raise ValueError('invalid table name %r' % name)
         else:
-            return tb
+            return deepcopy(tb)
 
-    def table(self, tblname, alias):
+    def table(self, tblname, alias=''):
+        if alias is '':
+            alias = tblname
         tb = self._access_table(tblname)      
         tb.set_alias(alias)
         self._table = tb
@@ -421,7 +419,7 @@ class DML(SQL):
             l = []
             f = '%s=%s'
             for k, v in self._value.items():
-                if isinstance(v, str): f = '%s="%s"'
+                if isinstance(v, StringType): f = '%s="%s"'
                 l.append(f % (k, v))
             return 'SET %s' % (', '.join(l))
 

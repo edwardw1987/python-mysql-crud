@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:17:15
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-15 18:27:27
+# @Last Modified time: 2015-11-15 20:14:16
 import sys
 sys.path.append('../')
 import os
@@ -50,7 +50,8 @@ class Handler(RequestHandler):
 
     def __init__(self, *args, **kwargs):
         super(Handler, self).__init__(*args, **kwargs)
-        self._backend_token = self._handle_backendtoken()
+        self.db = self.application.db
+        # self._backend_token = self._handle_backendtoken()
 
     def check_user_token(self):
         res = None
@@ -128,13 +129,14 @@ class RegisterHandler(Handler):
     def post(self):
         username = self.get_argument('username')
         password = self.get_argument('password')
-        matched_user = lambda: DB.dql().table('user').where(username=username).queryone()
-        if matched_user() is None:
-            DB.dml().table('user').insert(username=username, passwd=password).commit()
+        dqluser = self.db.dql.table('user', 'u').where({'u.username': username})
+        dmluser = self.db.dml.table('user')
+        if dqluser.queryone() is None:
+            dmluser.insert(username=username, passwd=password).commit()
         # dml.table('user').where(uid=2).update(passwd='dddddd').commit()
         # dml.table('user').where(uid=9).delete().commit()
         # captcha
-            self.write({'result':1, 'user': matched_user()})
+            self.write({'result':1, 'user': dqluser.queryone()})
         else:
             self.write({'result':0})
 

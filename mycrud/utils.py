@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-15 18:45:21
+# @Last Modified time: 2015-11-15 19:52:52
 try:
     from pymysql.cursors import DictCursor 
     from pymysql.connections import Connection 
@@ -12,7 +12,16 @@ except ImportError:
     from MySQLdb.connections import Connection
 from operator import itemgetter
 from itertools import islice
+import sys
 
+def string_type():
+    v = sys.version_info[0]
+    if v == 2:
+        _str = basestring
+    elif v == 3:
+        _str = str
+    return _str
+StringType = string_type()
 
 def sortit(iterable, key=None, reverse=False, conv=iter):
     """
@@ -43,6 +52,11 @@ class Cursor(DictCursor):
     def queryset(self):
         return QuerySet(self)
 
+    def execute(self, *args, **kwargs):
+        try:
+            super(Cursor, self).execute(*args, **kwargs)
+        except:
+            raise ValueError(*args, **kwargs)
 
 class QuerySet:
     """
