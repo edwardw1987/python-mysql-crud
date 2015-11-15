@@ -3,13 +3,11 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 21:41:01
+# @Last Modified time: 2015-11-15 18:47:05
 __metaclass__ = type
-from itertools import islice
-from operator import itemgetter
-from .utils import connect, dedupe
+from .utils import connect
 import sys
-import re
+
 
 class Joint:
 
@@ -104,52 +102,6 @@ class Condition:
             e.g. ' AND a=1 AND b>2 AND c<10 ...'
         """
         return ' AND '.join(self.get_fraction(key) for key in self.dict.keys())
-
-class QuerySet:
-    """
-        QuerySet receives a iterable-object
-    """
-    def __init__(self, iterator):
-        self.iterator = iterator
-
-    def __iter__(self):
-        for i in self.iterator:
-            yield i
-
-    def groupby(self, fieldname):
-        _dict = {}
-        _key = itemgetter(fieldname)
-        for i in self.iterator:
-            k = _key(i)
-            _dict.setdefault(k, [])
-            _dict[k].append(i)
-        return _dict
-
-    def sortby(self, field, desc=False):
-        ls = list(self.iterator)
-        ls.sort(key=itemgetter(field), reverse=desc)
-        self.iterator = iter(ls)
-        return self
-
-    def distinct(self):
-        pass
-
-    def values(self, field, distinct=False):
-        vg = (i[field] for i in self.iterator)
-        if distinct is True:
-            return tuple(dedupe(vg))
-        else:
-            return tuple(vg)
-
-    def all(self):
-        return tuple(self)
-
-    def slice(self, start, stop, step=1):
-        """
-        don't consume
-        start, stop, step
-        """
-        return tuple( i for i in islice(self.iterator, start, stop, step))
 
 
 class SQL:
@@ -341,7 +293,7 @@ class DQL(SQL):
     def query(self, *args, **kwargs):
         cursor = self.cursor()
         cursor.execute(self.write(*args, **kwargs))
-        return QuerySet(cursor.iterator())
+        return cursor.queryset()
 
     def queryone(self, *args, **kwargs):
         cursor = self.cursor()

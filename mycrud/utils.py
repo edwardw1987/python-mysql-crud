@@ -3,13 +3,15 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-14 21:29:13
+# @Last Modified time: 2015-11-15 18:45:21
 try:
     from pymysql.cursors import DictCursor 
     from pymysql.connections import Connection 
 except ImportError:
     from MySQLdb.cursors import DictCursor
     from MySQLdb.connections import Connection
+from operator import itemgetter
+from itertools import islice
 
 
 def sortit(iterable, key=None, reverse=False, conv=iter):
@@ -38,20 +40,46 @@ def dedupe(items):
 
 class Cursor(DictCursor):
 
-    def iterator(self):
-        return Iterator(self)
+    def queryset(self):
+        return QuerySet(self)
 
 
-class Iterator:
-
+class QuerySet:
+    """
+        QuerySet receives a cursor
+    """
     def __init__(self, cursor):
         self.cursor = cursor
 
-    def consume(self):
-        return self.cursor.fetchone()
-
     def __iter__(self):
-        return iter(self.consume, None)
+        return iter(lambda: self.cursor.fetchone(), None)
+
+    def groupby(self, fieldname):
+        _dict = {}
+        _key = itemgetter(fieldname)
+        for i in self:
+            k = _key(i)
+            _dict.setdefault(k, [])
+            _dict[k].append(i)
+        return _dict
+
+    def values(self, field, distinct=False):
+        vg = (i[field] for i in self)
+        if distinct is True:
+            return tuple(dedupe(vg))
+        else:
+            return tuple(vg)
+
+    def all(self):
+        return tuple(self)
+
+    def slice(self, start, stop, step=1):
+        """
+        don't consume
+        start, stop, step
+        """
+        return tuple( i for i in islice(self, start, stop, step))
+
 
 
 class Storage(dict):

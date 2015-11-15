@@ -3,14 +3,16 @@
 # @Author: edward
 # @Date:   2015-11-07 14:17:15
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-13 11:40:53
+# @Last Modified time: 2015-11-15 18:27:27
+import sys
+sys.path.append('../')
 import os
 from tornado.web import (
     RequestHandler, Application, url, HTTPError,authenticated)
 from tornado.ioloop import IOLoop
 from tornado.options import define
 import tornado
-from db import DB
+from mycrud import DataBase
 from datetime import datetime as DateTime, timedelta
 import time
 from random import randint, shuffle
@@ -276,6 +278,17 @@ class VerifyTokenHandler(Handler):
         self.set_header('Content-Type','application/json')
         self.write(jsonstr)
 
+class App(Application):
+
+    def __init__(self, *args, **kwargs):
+        super(App, self).__init__(*args, **kwargs)
+        self.db = DataBase(host='localhost',
+                            user='root',
+                            passwd='123123',
+                            name='db',
+                            )
+        
+
 # tornado资源配置
 settings = {
     'template_path': os.path.join(os.path.dirname(__file__), 'templates'),
@@ -286,7 +299,7 @@ settings = {
     'cookie_secret': 'abcdefg',
 }
 
-Application([
+App([
     (r'/?', HomeHandler),
     (r'/login/?', LoginHandler),
     (r'/other/?', OtherHtmlHandler),
