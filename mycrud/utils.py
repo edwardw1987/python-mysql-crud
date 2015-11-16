@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-15 19:52:52
+# @Last Modified time: 2015-11-16 14:24:39
 try:
     from pymysql.cursors import DictCursor 
     from pymysql.connections import Connection 
@@ -66,7 +66,7 @@ class QuerySet:
         self.cursor = cursor
 
     def __iter__(self):
-        return iter(lambda: self.cursor.fetchone(), None)
+        return iter(self.cursor.fetchone, None)
 
     def groupby(self, fieldname):
         _dict = {}
