@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:17:15
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-16 15:20:54
+# @Last Modified time: 2015-11-16 16:15:48
 import sys
 sys.path.append('../')
 import os
@@ -212,7 +212,7 @@ class MainHanlder(RequestHandler):
 class TestData(Handler):
     def get(self):
         start = self.get_argument_into('startpos', 0, into=int)
-        stop = start + self.get_argument_into('count', 10, into=int)
+        stop = self.get_argument_into('count', 10, into=int)
         results = self.db.dql.table('code_table').limit(start, stop).queryset.all()
         for r in results:
             r['code_produce_time'] = DateTime.strftime(r['code_produce_time'], '%Y-%m-%d')
