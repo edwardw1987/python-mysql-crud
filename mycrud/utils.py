@@ -3,16 +3,17 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-16 17:05:28
+# @Last Modified time: 2015-11-16 21:41:09
 try:
-    from pymysql.cursors import SSDictCursor 
-    from pymysql.connections import Connection 
+    from pymysql.cursors import SSDictCursor
+    from pymysql.connections import Connection
 except ImportError:
     from MySQLdb.cursors import SSDictCursor
     from MySQLdb.connections import Connection
 from operator import itemgetter
 from itertools import islice
 import sys
+
 
 def string_type():
     v = sys.version_info[0]
@@ -22,12 +23,6 @@ def string_type():
         _str = str
     return _str
 StringType = string_type()
-
-def sortit(iterable, key=None, reverse=False, conv=iter):
-    """
-    An alternative to 'sorted' which returns a sorted-iterator instead of a list.
-    """
-    return conv(sorted(iterable, key=key, reverse=_rev))
 
 
 def connect(**kwargs):
@@ -58,10 +53,13 @@ class Cursor(SSDictCursor):
         except:
             raise ValueError(*args, **kwargs)
 
+
 class QuerySet:
+
     """
         QuerySet receives a cursor
     """
+
     def __init__(self, cursor):
         self.cursor = cursor
 
@@ -98,8 +96,7 @@ class QuerySet:
         don't consume
         start, stop, step
         """
-        return tuple( i for i in islice(self, start, stop, step))
-
+        return tuple(i for i in islice(self, start, stop, step))
 
 
 class Storage(dict):

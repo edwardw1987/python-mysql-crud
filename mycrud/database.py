@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-16 14:52:09
+# @Last Modified time: 2015-11-16 22:18:27
 __metaclass__ = type
 from .utils import connect, Storage, StringType
 from .crud import DQL, DML
@@ -26,23 +26,25 @@ class DataBase:
 
     def _init_table(self, tblname, fields):
         self.tables[tblname] = Table(name=tblname, fields=fields)
- 
-    def _init_mapping(self, **kwargs):
-        cursor = connect(**kwargs).cursor()
-        cursor.execute('SHOW TABLES')
-        tables = Storage()
-        for r in cursor:
-            for tbname in r.values():
-                tables[tbname] = []
-                break
 
-        for key in tables:
-            cursor.execute('DESC %s' % key)
-            ls = tables[key]
+    def _init_mapping(self, **kwargs):
+        try:
+            cursor = connect(**kwargs).cursor()
+            cursor.execute('SHOW TABLES')
+            tables = Storage()
             for r in cursor:
-                ls.append(r['Field'])
-            tables[key] = tuple(tables[key])
-        return tables
+                for tbname in r.values():
+                    tables[tbname] = []
+                    break
+            for key in tables:
+                cursor.execute('DESC %s' % key)
+                ls = tables[key]
+                for r in cursor:
+                    ls.append(r['Field'])
+                tables[key] = tuple(tables[key])
+            return tables
+        finally:
+            cursor.close()
 
     def GetTable(self, tblname):
         return self.tables[tblname]
@@ -102,6 +104,7 @@ class Table:
             raise ValueError('invalid Table alias %r' % alias)
         else:
             self.alias = alias
+
 
 class Field:
 
