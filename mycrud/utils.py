@@ -3,12 +3,12 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-16 16:26:11
+# @Last Modified time: 2015-11-16 16:48:00
 try:
-    from pymysql.cursors import DictCursor 
+    from pymysql.cursors import SSDictCursor 
     from pymysql.connections import Connection 
 except ImportError:
-    from MySQLdb.cursors import DictCursor
+    from MySQLdb.cursors import SSDictCursor
     from MySQLdb.connections import Connection
 from operator import itemgetter
 from itertools import islice
@@ -47,7 +47,7 @@ def dedupe(items):
             seen.add(item)
 
 
-class Cursor(DictCursor):
+class Cursor(SSDictCursor):
 
     def queryset(self):
         return QuerySet(self)
@@ -66,8 +66,7 @@ class QuerySet:
         self.cursor = cursor
 
     def _retrieve(self):
-        while 1:    
-            row = self.cursor.fetchone()
+        for row in self.cursor:
             if row is None:
                 self.cursor.close()
                 break
