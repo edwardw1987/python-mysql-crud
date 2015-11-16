@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-16 21:41:09
+# @Last Modified time: 2015-11-16 22:42:00
 try:
     from pymysql.cursors import SSDictCursor
     from pymysql.connections import Connection
@@ -47,17 +47,12 @@ class Cursor(SSDictCursor):
     def queryset(self):
         return QuerySet(self)
 
-    def execute(self, *args, **kwargs):
-        try:
-            super(Cursor, self).execute(*args, **kwargs)
-        except:
-            raise ValueError(*args, **kwargs)
-
 
 class QuerySet:
 
     """
-        QuerySet receives a cursor
+        'QuerySet' receives an instance of 'SSDictCursor' as argument.
+
     """
 
     def __init__(self, cursor):
