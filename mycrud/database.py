@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-15 20:11:38
+# @Last Modified time: 2015-11-16 14:52:09
 __metaclass__ = type
 from .utils import connect, Storage, StringType
 from .crud import DQL, DML
@@ -31,7 +31,7 @@ class DataBase:
         cursor = connect(**kwargs).cursor()
         cursor.execute('SHOW TABLES')
         tables = Storage()
-        for r in cursor.queryset():
+        for r in cursor:
             for tbname in r.values():
                 tables[tbname] = []
                 break
@@ -39,7 +39,7 @@ class DataBase:
         for key in tables:
             cursor.execute('DESC %s' % key)
             ls = tables[key]
-            for r in cursor.queryset():
+            for r in cursor:
                 ls.append(r['Field'])
             tables[key] = tuple(tables[key])
         return tables
