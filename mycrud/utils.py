@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
-# @Last Modified by:   edward
-# @Last Modified time: 2015-11-16 14:59:43
+# @Last Modified by:   python
+# @Last Modified time: 2015-11-16 15:18:31
 try:
     from pymysql.cursors import DictCursor 
     from pymysql.connections import Connection 
@@ -67,14 +67,14 @@ class QuerySet:
 
     def retrieve(self):
         try:
-            for row in self.cursor:
-                yield row
+            row = self.cursor.fetchone()
+            return row
         finally:
             if row is None:
                 self.cursor.close()
 
     def __iter__(self):
-        return iter(self.retrive, None)
+        return iter(self.retrieve, None)
 
     def groupby(self, fieldname):
         _dict = {}
