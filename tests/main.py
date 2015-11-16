@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:17:15
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-15 20:14:16
+# @Last Modified time: 2015-11-16 11:21:41
 import sys
 sys.path.append('../')
 import os
@@ -51,7 +51,8 @@ class Handler(RequestHandler):
     def __init__(self, *args, **kwargs):
         super(Handler, self).__init__(*args, **kwargs)
         self.db = self.application.db
-        # self._backend_token = self._handle_backendtoken()
+        if getattr(self.db.tables, 'token_table', None) is not None:
+            self._backend_token = self._handle_backendtoken()
 
     def check_user_token(self):
         res = None
@@ -88,7 +89,7 @@ class Handler(RequestHandler):
 
     def _handle_backendtoken(self):
         access, refresh = self.tokens
-        row = DB.dql().table('token_table', alias='t')\
+        row = self.db.dql.table('token_table', alias='t')\
             .inner_join('code_table', on='t.token_codeid=c.code_id', alias='c')\
             .where({
                 'token_access_token': access,
@@ -113,7 +114,7 @@ class Handler(RequestHandler):
         assert token, "token doesn't exist"
         code = token['code_access_code']
         access, _ = produce_tokens(code)
-        DB.dml().table('token_table').where(token_id=token['token_id'])\
+        self.db.dml.table('token_table').where(token_id=token['token_id'])\
         .update({"token_refresh_time": DateTime.strftime(DateTime.now(), "%Y-%m-%d %H:%M:%S"),
                 "token_access_token": access })
         return access, token['token_refresh_token']
@@ -124,6 +125,31 @@ class Handler(RequestHandler):
         if into is not None:
             r = into(r)
         return r
+
+    def validate_code(self, code):
+        #  1 code is valid
+        #  0 code is used
+        # -1 code is invalid
+        # -2 code is expired
+        access_code = self.db.dql.table('code_table').where(code_access_code=code).queryone()
+        if access_code is None:
+            return -1
+        else:
+            # Any access-code would be expired in 30 mins.
+            expires_limit = timedelta(minutes=30)
+            now_time = DateTime.now()
+            produce_time = access_code['code_produce_time']
+            if (now_time - produce_time) <= expires_limit:
+                return (not self._verify_token_by_code(code) and 1 or 0)
+            else:
+                return -2
+
+    def _verify_token_by_code(self, code):
+        codeObj = self.db.dql.table('code_table', 'c').\
+                inner_join('token_table', on="c.code_id=t.token_codeid", alias="t").\
+                where(code_access_code=code).queryone()
+        return False if codeObj is None else True
+
 
 class RegisterHandler(Handler):
     def post(self):
@@ -187,7 +213,7 @@ class TestData(Handler):
     def get(self):
         start = self.get_argument_into('startpos', 0, into=int)
         stop = start + self.get_argument_into('count', 10, into=int)
-        results = DB.dql().table('code_table').limit(0,2).queryset.all()
+        results = self.db.dql.table('code_table').limit(0,2).queryset.all()
         for r in results:
             r['code_produce_time'] = DateTime.strftime(r['code_produce_time'], '%Y-%m-%d')
         self.write({'testdata': results})
@@ -198,35 +224,13 @@ class AccessCodeHandler(Handler):
         response = {'result': 0}
         if client_id in CLIENT_SECRETS:
             randstr = getuniquestring()
-            DB.dml().table('code_table').insert({"code_access_code": randstr})
+            self.db.dml.table('code_table').insert({"code_access_code": randstr})
             response = {'result':1 , "access_code": randstr}
         jsonstr = json.dumps(response)
         self.set_header('Content-Type','application/json')
         self.write(jsonstr)
 
-def IsTokenExistsByCode(code):
-    codeObj = DB.dql().table('code_table', 'c').\
-            inner_join('token_table', on="c.code_id=t.token_codeid", alias="t").\
-            where(code_access_code=code).queryone()
-    return False if codeObj is None else True
 
-def IsValidCode(code):
-    #  1 code is valid
-    #  0 code is used
-    # -1 code is invalid
-    # -2 code is expired
-    access_code = DB.dql().table('code_table').where(code_access_code=code).queryone()
-    if access_code is None:
-        return -1
-    else:
-        # Any access-code would be expired in 30 mins.
-        expires_limit = timedelta(minutes=30)
-        now_time = DateTime.now()
-        produce_time = access_code['code_produce_time']
-        if (now_time - produce_time) <= expires_limit:
-            return (not IsTokenExistsByCode(code) and 1 or 0)
-        else:
-            return -2
 
 def IsValidClient(client_id, client_secret):
     return (CLIENT_SECRETS.get(client_id) == client_secret)
@@ -236,12 +240,12 @@ class AccessTokenHandler(Handler):
         client_id = self.get_argument_into('client_id', None)
         client_secret = self.get_argument_into('client_secret', None)
         code = self.get_argument_into('code', None)
-        validateCode = IsValidCode(code)
+        validateCode = self.validate_code(code)
         if validateCode == True and IsValidClient(client_id, client_secret):
-            codeObj = DB.dql().table('code_table').where(code_access_code=code).queryone()
+            codeObj = self.db.dql.table('code_table').where(code_access_code=code).queryone()
             code_id = codeObj and codeObj['code_id']
             access, refresh = produce_tokens(code)
-            DB.dml().table('token_table').insert({
+            self.db.dml.table('token_table').insert({
                                     "token_codeid": code_id,
                                     'token_access_token': access,
                                     'token_refresh_token': refresh})
@@ -287,7 +291,7 @@ class App(Application):
         self.db = DataBase(host='localhost',
                             user='root',
                             passwd='123123',
-                            name='db',
+                            name='QGYM' if os.uname()[1] == 'python-pc' else 'db',
                             )
         
 
