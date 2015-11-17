@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-16 22:18:27
+# @Last Modified time: 2015-11-17 16:29:50
 __metaclass__ = type
 from .utils import connect, Storage, StringType
 from .crud import DQL, DML
@@ -17,19 +17,26 @@ class DataBase:
         self.user = user
         self.passwd = passwd
         self.tables = Storage()
-        self._init_db(host=host, db=name, user=user, passwd=passwd)
+        self._init_db()
 
-    def _init_db(self, **kwargs):
-        mapping = self._init_mapping(**kwargs)
+    def cursor(self):
+        return connect(
+            host = self.host,
+            db = self.name,
+            user = self.user,
+            passwd = self.passwd
+            ).cursor()
+
+    def _init_db(self):
+        mapping = self._init_mapping()
         for tblname, fl in mapping.items():
             self._init_table(tblname, fl)
 
     def _init_table(self, tblname, fields):
         self.tables[tblname] = Table(name=tblname, fields=fields)
 
-    def _init_mapping(self, **kwargs):
-        try:
-            cursor = connect(**kwargs).cursor()
+    def _init_mapping(self):
+        with self.cursor() as cursor:
             cursor.execute('SHOW TABLES')
             tables = Storage()
             for r in cursor:
@@ -42,9 +49,7 @@ class DataBase:
                 for r in cursor:
                     ls.append(r['Field'])
                 tables[key] = tuple(tables[key])
-            return tables
-        finally:
-            cursor.close()
+        return tables
 
     def GetTable(self, tblname):
         return self.tables[tblname]

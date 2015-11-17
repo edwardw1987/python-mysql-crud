@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-16 22:42:00
+# @Last Modified time: 2015-11-17 16:27:30
 try:
     from pymysql.cursors import SSDictCursor
     from pymysql.connections import Connection
@@ -44,6 +44,12 @@ def dedupe(items):
 
 class Cursor(SSDictCursor):
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, et, ev, tb):
+        return self.close()
+    
     def queryset(self):
         return QuerySet(self)
 
