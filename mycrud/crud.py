@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-20 16:50:15
+# @Last Modified time: 2015-11-20 17:39:16
 __metaclass__ = type
 from utils import connect, StringType
 from copy import deepcopy
@@ -105,10 +105,15 @@ OPERATORS = {
 
 def dq(s):
     """
-    double-quote str object, e.g. 'a' --> '"a"'
+    double-quote str object, e.g. 
+    'a' --> '"a"'
+    or apply str to non-str object 
+    100 --> '100'
     """
-    return '"%s"' % s.replace('"', '')
-
+    if isinstance(s, StringType):
+        return '"%s"' % s.replace('"', '')
+    else:
+        return str(s)
 class Config:
     """
     richkey: str, startswith 'tablename(alias).fieldname', endswith '__xxx' or not
@@ -116,14 +121,14 @@ class Config:
     one richkey could be 'key__lt' which endswith one tail of '__lt', 
     that means to use '<' as the operator of config object.
     (each tails mapping to the operator in 'SQL' syntax)
-    rickkey supports following tails (inspired by django orm):
+    richkey supports following tails (inspired by django orm):
     1. 'eq': '=', the default tail to richkey if the tail is not given
     2. 'lt': '<', less than
     3. 'lte': '<=', less than or equal 
     4. 'gt': '>' greater than
     5. 'gte': '>='
     6. 'in': 'IN', the parameter 'val' should be in a range, such as ('a', 'b', 'c')
-        especially, str object is supported e.g. 'abc'
+        (especially, str object is supported e.g. 'abc')
     7. 'like': 'LIKE'
     """
     def __init__(self, richkey, val):
@@ -162,7 +167,7 @@ class Config:
         """
         group key, operator and value together, finally return
         """
-        f = '{key} {operator} {value}'
+        F = '{key} {operator} {value}'
         # key
         k = self._key
         # operator
@@ -170,10 +175,21 @@ class Config:
         opt = OPERATORS[t or 'eq']
         # value
         val = v = self._value
-        if isinstance(v, StringType):
-            pass
-        self._config = f.format(key=k, operator=opt, value=val)
+        if t == 'in':
+            val = self._handle_in(v)
+        elif t == 'like':
+            val = self._handle_like(v)
+        else:
+            val = self._handle_common(V)
+        self._config = F.format(key=k, operator=opt, value=val)
 
+    def _handle_in(val):
+        return '(' + ', '.join(dq(e) for e in val) + ')'
+
+    def _handle_like(val):
+        pass
+    def _handle_common(self):
+        pass
     def set(self, richkey, val):
         self.initialize(richkey, val)
 
