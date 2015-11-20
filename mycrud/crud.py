@@ -3,10 +3,9 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-15 20:12:29
+# @Last Modified time: 2015-11-18 21:53:53
 __metaclass__ = type
-from .utils import connect, StringType
-from copy import deepcopy
+from .utils import connect, StringType, clone
 
 
 class Joint:
@@ -107,6 +106,15 @@ class SQL:
         self.db = db
         self.reset()
 
+    def __del__(self):
+        if getattr(self, '_connection', None) is not None:
+            self._connection.close()
+            self._connection = None
+
+    @property
+    def clone(self):
+        return clone(self)
+
     def reset(self):
         self._connection = None
         self._table = None
@@ -137,7 +145,7 @@ class SQL:
         except AttributeError:
             raise ValueError('invalid table name %r' % name)
         else:
-            return deepcopy(tb)
+            return clone(tb)
 
     def table(self, tblname, alias=''):
         if alias is '':
@@ -145,7 +153,7 @@ class SQL:
         tb = self._access_table(tblname)      
         tb.set_alias(alias)
         self._table = tb
-        return self
+        return self.clone
 
     @property
     def fields(self):
@@ -302,13 +310,13 @@ class DQL(SQL):
         tb = self._access_table(tblname)
         tb.set_alias(alias)
         self._joints.append(Joint(tb,on))
-        return self
+        return self.clone
 
     def where(self, dictObj={}, **kwargs):
         _dictObj = dictObj.copy()
         _dictObj.update(**kwargs)
         self._where = Condition(_dictObj).clause()
-        return self
+        return self.clone
 
     def orderby(self, field, desc=False, key=None):
         """
@@ -319,18 +327,18 @@ class DQL(SQL):
         ob = key and key(field) or field 
         if desc is True : ob = into_desc(ob)
         self._orderbys.append(ob)
-        return self
+        return self.clone
 
     def distinct(self):
         self._distinct = True
-        return self
+        return self.clone
 
     def limit(self, startpos=0, count=0):
         if startpos > 0 and count == 0:
             self._limit = 0, startpos
         elif startpos >= 0 and count > 0:
             self._limit = startpos, count
-        return self
+        return self.clone
 
 
 class DML(SQL):
@@ -354,7 +362,6 @@ class DML(SQL):
 
     def value(self, **kwargs):
         self._value = kwargs
-        return self
 
     def delete(self):
         cursor = self.cursor()

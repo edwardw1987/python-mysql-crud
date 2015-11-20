@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-17 23:42:34
+# @Last Modified time: 2015-11-18 21:43:12
 try:
     from pymysql.cursors import SSDictCursor
     from pymysql.connections import Connection
@@ -13,6 +13,7 @@ except ImportError:
 from operator import itemgetter
 from itertools import islice
 import sys
+from copy import deepcopy as clone
 
 
 def string_type():

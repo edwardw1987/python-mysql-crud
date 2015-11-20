@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-17 16:29:50
+# @Last Modified time: 2015-11-18 22:11:24
 __metaclass__ = type
 from .utils import connect, Storage, StringType
 from .crud import DQL, DML
@@ -21,11 +21,11 @@ class DataBase:
 
     def cursor(self):
         return connect(
-            host = self.host,
-            db = self.name,
-            user = self.user,
-            passwd = self.passwd
-            ).cursor()
+            host=self.host,
+            db=self.name,
+            user=self.user,
+            passwd=self.passwd
+        ).cursor()
 
     def _init_db(self):
         mapping = self._init_mapping()
@@ -43,7 +43,7 @@ class DataBase:
                 for tbname in r.values():
                     tables[tbname] = []
                     break
-            for key in tables:
+            for key, val in tables:
                 cursor.execute('DESC %s' % key)
                 ls = tables[key]
                 for r in cursor:
