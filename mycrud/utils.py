@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-17 16:27:30
+# @Last Modified time: 2015-11-17 23:42:34
 try:
     from pymysql.cursors import SSDictCursor
     from pymysql.connections import Connection
@@ -49,7 +49,7 @@ class Cursor(SSDictCursor):
 
     def __exit__(self, et, ev, tb):
         return self.close()
-    
+
     def queryset(self):
         return QuerySet(self)
 
@@ -57,24 +57,26 @@ class Cursor(SSDictCursor):
 class QuerySet:
 
     """
-        'QuerySet' receives an instance of 'SSDictCursor' as argument.
-
+    'QuerySet' stands to be receiving a iterable object containing dict-like object.
     """
 
-    def __init__(self, cursor):
-        self.cursor = cursor
+    def __init__(self, iterable):
+        self._resultset = iter(iterable)
 
     def _retrieve(self):
-        for row in self.cursor:
-            yield row
+        if hasattr(self._resultset, '__enter__'):
+            with self._resultset as _rs:
+                for r in _rs:
+                    yield r
         else:
-            self.cursor.close()
+            for r in self._resultset:
+                yield r
 
     def __iter__(self):
         return self._retrieve()
 
     def groupby(self, fieldname):
-        _dict = {}
+        _dict = Storage()
         _key = itemgetter(fieldname)
         for i in self:
             k = _key(i)
@@ -93,14 +95,13 @@ class QuerySet:
         return tuple(self)
 
     def slice(self, start, stop, step=1):
-        """
-        don't consume
-        start, stop, step
-        """
         return tuple(i for i in islice(self, start, stop, step))
 
 
 class Storage(dict):
+
+    def __iter__(self):
+        return iter(self.items())
 
     def __getattr__(self, key):
         try:
@@ -116,6 +117,6 @@ class Storage(dict):
             del self[key]
         except KeyError as K:
             raise AttributeError(k)
-
-    def __repr__(self):
-        return '<Storage ' + dict.__repr__(self) + '>'
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
