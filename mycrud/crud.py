@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Author: edward
-# @Date:   2015-10-09 13:41:39
+# @Date:   2015-11-20 20:45:05
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-18 21:53:53
+# @Last Modified time: 2015-11-20 21:59:17
 __metaclass__ = type
 from .utils import connect, StringType, clone
 
@@ -26,78 +26,168 @@ class Joint:
         self.rel = rel.strip()
         self.duplication = self.rel.split('=')[0].strip()
     
-class Condition:
+# ====================
+OPERATORS = {
+    'eq': '=',
+    'lt': '<',
+    'lte': '<=',
+    'gt': '>',
+    'gte': '>=',
+    'in': 'IN',
+    'like': 'LIKE',
+}
 
-    def __init__(self, dictObj):
-        self.dict = self._valid_dict(dictObj)
-        self.token_mapping = {
-            'eq': '= %s',
-            'lt': '< %s',
-            'lte': '<= %s',
-            'gt': '> %s',
-            'gte': '>= %s',
-            'in': 'IN (%s)',
-            'range': 'BETWEEN %s AND %s',
-            'like': 'LIKE %s',
-        }
+def dq(s):
+    """
+    double-quote str object, e.g. 
+    'a' --> '"a"'
+    or apply str to non-str object 
+    100 --> '100'
+    """
+    if isinstance(s, StringType):
+        return '"%s"' % s.replace('"', '')
+    else:
+        return str(s)
 
-    def _valid_dict(self, dictObj):
-        """
-            validate the value of items of dictObj
-            if value is 'None' then filter item away
-        """
-        _filter_func = lambda p: False if p[-1] is None else True
-        return dict(filter(_filter_func, dictObj.items()))
+class Config:
+    """
+    richkey: str, startswith 'tablename(alias).fieldname', endswith '__xxx' or not
+    val: pyobject supports to be operated in 'SQL' syntax, usually str, int except for None, False, True
+    one richkey could be 'key__lt' which endswith one tail of '__lt', 
+    that means to use '<' as the operator of config object.
+    (each tails mapping to the operator in 'SQL' syntax)
+    richkey supports following tails (inspired by django orm):
+    1. 'eq': '=', the default tail to richkey if the tail is not given
+    2. 'lt': '<', less than
+    3. 'lte': '<=', less than or equal 
+    4. 'gt': '>' greater than
+    5. 'gte': '>='
+    6. 'in': 'IN', the parameter 'val' should be in a range, such as ('a', 'b', 'c')
+        (especially, str object is supported e.g. 'abc')
+    7. 'like': 'LIKE'
+    """
+    def __init__(self, richkey, val):
+        self.initialize(richkey, val)
 
-    def resolve(self, key):
-        """
-            'key__tail' --> ('key', 'tail')
-            'key'       --> ('key', '')
-        """
-        ls = key.split('_' * 2)
-        length = len(ls)
-        if length == 1:
-            res = (ls[0], '')
+    def __repr__(self):
+        return repr(self.read())
+
+    def __and__(self, config):
+        if getattr(config, '_config', None) is None:
+            raise TypeError("unsupported type of %r" % config.__class__.__name__)
         else:
-            res = ls[-2:]
-        return tuple(res)
+            _cnf = self._config
+            c_cnf = config._config
+            if _cnf in c_cnf:
+                raise ValueError("duplicated value of %r" % c_cnf)
+            else:
+                cln = clone(self)
+                cln._config = ' AND '.join([_cnf, c_cnf])
+                return cln
 
-    def get_token(self, tail):
-        """
-            mapping token by tail, e.g. 'lt', 'eq', 'gt'...
-        """
-        token = self.token_mapping.get(tail) or self.token_mapping['eq']
-        return token
+    def __or__(self, config):
+        if getattr(config, '_config', None) is None:
+            raise TypeError("unsupported type of %r" % config.__class__.__name__)
+        else:
+            _cnf = self._config
+            c_cnf = config._config
+            if _cnf in c_cnf:
+                raise ValueError("duplicated value of %r" % c_cnf)
+            else:
+                cln = clone(self)
+                cln._config = '(' + ' OR '.join([_cnf, c_cnf]) + ')'
+                return cln
+        
+    def initialize(self, richkey, val):
+        self._resolve_richkey(richkey)
+        self._handle_value(val)
+        self._handle_config()
 
-    def get_fraction(self, key):
+    def _handle_config(self):
         """
-            1. Get single sql-fraction such as 
-               'id = 1','id IN (1,2,3)' or 'id >= 5'
-            2. While value is of type of str or unicode, the new token will be used instead,
-               e.g. city="上海", token '= %s' --> '= "%s"' 
-            3. e.g. id__in=(1,) <==> WHERE id IN (1); val = (1,) --> '(1)'
-               e.g. id__in=(1,2,3) <==> WHERE id IN (1,2,3); val = (1,2,3) --> '(1,2,3)'
+        To combine together key, operator and value, finally return the combination
         """
-        ckey, tail = self.resolve(key)
-        token = self.get_token(tail)
-        value = self.dict[key]
-        # ckey is equivalent to fieldname
-        # access corresponding table by fieldname
+        F = '{key}{operator}{value}'
+        # key
+        k = self._key
+        # operator
+        t = self._tail or 'eq'
+        opt = OPERATORS[t]
+        # value
+        val = v = self._value
+        if t == 'in':
+            val = self._handle_in(v)
+        elif t == 'like':
+            val = self._handle_like(v)
+        else:
+            val = self._handle_common(v)
+        self._config = F.format(key=k, operator=opt, value=val)
 
-        if isinstance(value, StringType):
-            token = token % '"%s"'
-        elif isinstance(value, (tuple, list)):
-            if tail in ('in',):
-                value = ','.join(str(i) for i in value)
-        return '{key} {condition}'.format(key=ckey, condition=(token % value))
+    def _handle_in(self, val):
+        return '(' + ', '.join(dq(e) for e in val) + ')'
 
-    def clause(self):
-        """
-            Get conditional clause joined with 'AND'
-            e.g. ' AND a=1 AND b>2 AND c<10 ...'
-        """
-        return ' AND '.join(self.get_fraction(key) for key in self.dict.keys())
+    def _handle_like(self, val):
+        pass
 
+    def _handle_common(self, val):
+        return val 
+
+    def set(self, richkey, val):
+        self.initialize(richkey, val)
+
+    def read(self):
+        return self._config
+
+    @staticmethod
+    def validate(val):
+        return
+        if (val is None) or (val is False) or (val is True):
+            raise ValueError('invalid value %r' % val)
+
+    @classmethod
+    def isrich(cls, key):
+        rsk = cls.resolve(key)
+        if len(rsk) == 1:
+            return False
+        else:
+            return True
+
+    def _resolve_richkey(self, richkey):
+        rsk = self.resolve(richkey)
+        if len(rsk) == 1:
+            self._key, = rsk
+            self._tail = None
+        else:
+            self._key, self._tail = rsk 
+
+    def _handle_value(self, val):
+        self.validate(val)
+        self._value = val 
+
+    @staticmethod
+    def resolve(richkey):
+        """
+        richkey: str
+        resovle from --> to
+        'key__tail'  --> ('key', 'tail')
+        'key'        --> ('key', '')
+        """
+        if len(richkey) != 0:
+            if '__' in richkey:
+                key, tail = richkey.split('__')
+                if len(key) > 0 and len(tail) > 0:
+                    if tail in OPERATORS:
+                        return key, tail
+                    else:
+                        raise ValueError('invalid richkey tail %r' % tail)
+                else:
+                    raise ValueError('invalid richkey %r' % richkey)
+            else:
+                return richkey,
+        else:
+            raise ValueError('invalid richkey %r' % richkey)
+
+config = Config
 
 class SQL:
 
@@ -435,3 +525,15 @@ class DML(SQL):
         
     def _handle_where(self):
         return ('WHERE %s' % self._where) if self._where else None  
+
+if __name__ == '__main__':
+    a = config('a', 1)
+    b = config('b__gt', 2)
+    c = config('c__lte', 3)
+    d = a & b & c
+    print(a.read())
+    print(b.read())
+    print(c.read())
+    print(d.read())
+    print(config.isrich('ab__lt'))
+    print(config.resolve('a__lt'))
