@@ -3,9 +3,9 @@
 # @Author: edward
 # @Date:   2015-10-09 13:41:39
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-15 20:12:29
+# @Last Modified time: 2015-11-20 16:50:15
 __metaclass__ = type
-from .utils import connect, StringType
+from utils import connect, StringType
 from copy import deepcopy
 
 
@@ -92,12 +92,141 @@ class Condition:
                 value = ','.join(str(i) for i in value)
         return '{key} {condition}'.format(key=ckey, condition=(token % value))
 
-    def clause(self):
+# ====================
+OPERATORS = {
+    'eq': '=',
+    'lt': '<',
+    'lte': '<=',
+    'gt': '>',
+    'gte': '>=',
+    'in': 'IN',
+    'like': 'LIKE',
+}
+
+def dq(s):
+    """
+    double-quote str object, e.g. 'a' --> '"a"'
+    """
+    return '"%s"' % s.replace('"', '')
+
+class Config:
+    """
+    richkey: str, startswith 'tablename(alias).fieldname', endswith '__xxx' or not
+    val: pyobject supports to be operated in 'SQL' syntax, usually str, int except for None, False, True
+    one richkey could be 'key__lt' which endswith one tail of '__lt', 
+    that means to use '<' as the operator of config object.
+    (each tails mapping to the operator in 'SQL' syntax)
+    rickkey supports following tails (inspired by django orm):
+    1. 'eq': '=', the default tail to richkey if the tail is not given
+    2. 'lt': '<', less than
+    3. 'lte': '<=', less than or equal 
+    4. 'gt': '>' greater than
+    5. 'gte': '>='
+    6. 'in': 'IN', the parameter 'val' should be in a range, such as ('a', 'b', 'c')
+        especially, str object is supported e.g. 'abc'
+    7. 'like': 'LIKE'
+    """
+    def __init__(self, richkey, val):
+        self.initialize(richkey, val)
+
+    def __and__(self, config):
+        if getattr(config, '_config', None) is None:
+            raise TypeError("unsupport type of %r for '&' operator" % config.__class__.__name__)
+        else:
+            _cnf = self._config
+            c_cnf = config._config
+            if _cnf != c_cnf:
+                self._config = ' AND '.join([_cnf, config._config])
+                return self
+            else:
+                raise ValueError("unsupport duplicated value of %r for '&' operator" % c_cnf)
+
+    def __or__(self, config):
+        if getattr(config, '_config', None) is None:
+            raise TypeError("unsupport type of %r for '&' operator" % config.__class__.__name__)
+        else:
+            _cnf = self._config
+            c_cnf = config._config
+            if _cnf != c_cnf:
+                self._config = '(' + ' OR '.join([_cnf, config._config]) + ')'
+                return self
+            else:
+                raise ValueError("unsupport duplicated value of %r for '&' operator" % c_cnf)
+        
+    def initialize(self, richkey, val):
+        self._resolve_richkey(richkey)
+        self._handle_value(val)
+        self._handle_config()
+
+    def _handle_config(self):
         """
-            Get conditional clause joined with 'AND'
-            e.g. ' AND a=1 AND b>2 AND c<10 ...'
+        group key, operator and value together, finally return
         """
-        return ' AND '.join(self.get_fraction(key) for key in self.dict.keys())
+        f = '{key} {operator} {value}'
+        # key
+        k = self._key
+        # operator
+        t = self._tail
+        opt = OPERATORS[t or 'eq']
+        # value
+        val = v = self._value
+        if isinstance(v, StringType):
+            pass
+        self._config = f.format(key=k, operator=opt, value=val)
+
+    def set(self, richkey, val):
+        self.initialize(richkey, val)
+
+    def read(self):
+        return self._config
+
+    @staticmethod
+    def validate(val):
+        if (val is None) or (val is False) or (val is True):
+            raise ValueError('invalid value %r' % val)
+
+    @classmethod
+    def isrich(cls, key):
+        rsk = cls.resolve(key)
+        if len(rsk) == 1:
+            return False
+        else:
+            return True
+
+    def _resolve_richkey(self, richkey):
+        rsk = self.resolve(richkey)
+        if len(rsk) == 1:
+            self._key, = rsk
+            self._tail = None
+        else:
+            self._key, self._tail = rsk 
+
+    def _handle_value(self, val):
+        self.validate(val)
+        self._value = val 
+
+    @staticmethod
+    def resolve(richkey):
+        """
+        richkey: str
+        resovle from --> to
+        'key__tail'  --> ('key', 'tail')
+        'key'        --> ('key', '')
+        """
+        if len(richkey) != 0:
+            if '__' in richkey:
+                key, tail = richkey.split('__')
+                if len(key) > 0 and len(tail) > 0:
+                    if tail in OPERATORS:
+                        return key, tail
+                    else:
+                        raise ValueError('invalid richkey tail %r' % tail)
+                else:
+                    raise ValueError('invalid richkey %r' % richkey)
+            else:
+                return richkey,
+        else:
+            raise ValueError('invalid richkey %r' % richkey)
 
 
 class SQL:
@@ -428,3 +557,10 @@ class DML(SQL):
         
     def _handle_where(self):
         return ('WHERE %s' % self._where) if self._where else None  
+
+if __name__ == '__main__':
+    _ = Config
+    a = _('a', 1) & (_('b__gt', 2) | _('c__lte', 3))
+    print(a.read())
+    print(Config.isrich('ab__lt'))
+    print(Config.resolve('a__lt'))
