@@ -3,12 +3,14 @@
 # @Author: edward
 # @Date:   2015-11-20 20:45:05
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-21 20:54:31
+# @Last Modified time: 2015-11-22 00:09:54
 __metaclass__ = type
 try:
     from utils import connect, StringType, clone, dq
 except ImportError:
     from .utils import connect, StringType, clone, dq
+import re
+
 
 class Joint:
 
@@ -38,6 +40,116 @@ OPERATORS = {
     'in': 'IN',
     'like': 'LIKE',
 }
+
+class Hack:
+    """
+    Hacking default behavior of signs
+    """
+    def __init__(self, key):
+        self.key = key
+
+    def __repr__(self):
+        return repr(self.read())
+
+    def set(self, sign, val):
+        self.exp = ('%s {} %s'.format(sign)) % (self.key, val)
+        return self
+
+    def read(self):
+        return getattr(self, 'group', getattr(self, 'exp', ''))
+
+    def resolve(self):
+        """
+        >>> a = Hack('a'); b = Hack('b')
+        >>> a.resolve()
+        ()
+        >>> a > 123; b < 456;
+        >>> c = a & b 
+        >>> a.resolve()
+        ('a > 123',)
+        >>> c.resolve()
+        ('a > 123', 'b < 456')
+        """
+        return tuple(i for i in map(str.strip, re.split(r'AND|OR|\)|\(', self.read())) if i != '')
+
+    def __and__(self, hack):
+        """
+        >>> a = Hack('a'); b = Hack('b')
+        >>> a > 1; b < 2
+        >>> c = a & b
+        >>> c
+        'a > 1 AND b < 2'
+        >>> a
+        'a > 1'
+        >>> b
+        'b < 2'
+        """
+        if not isinstance(hack, Hack):
+            raise TypeError("unsupported type of %r" % hack.__class__.__name__)
+        else:
+            se = self.resolve()
+            he = hack.resolve()
+            sh = tuple(set(se) & set(he))
+            if len(sh) > 0:
+                raise ValueError("duplicated value %r" % sh[0])
+            else:
+                cln = clone(self)
+                cln.group = ' AND '.join(i for i in [self.read(), hack.read()] if i != '')
+                return cln
+
+    def __eq__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h == 3
+        >>> h 
+        'key = 3'
+        """
+        self.set('=', val)
+
+    def __ne__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h != 3
+        >>> h
+        'key != 3'
+        """
+        self.set('!=', val)
+
+    def __gt__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h > 3
+        >>> h
+        'key > 3'
+        """
+        self.set('>', val)
+
+    def __ge__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h >= 3
+        >>> h
+        'key >= 3'
+        """
+        self.set('>=', val)
+
+    def __lt__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h < 3
+        >>> h
+        'key < 3'
+        """
+        self.set('<', val)
+
+    def __le__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h <= 3
+        >>> h
+        'key <= 3'
+        """
+        self.set('<=', val)
 
 
 class Config:
@@ -179,7 +291,7 @@ class Config:
             raise ValueError('invalid richkey %r' % richkey)
 
 config = Config
-
+# ====================
 class SQL:
 
     def __init__(self, db):
@@ -392,7 +504,7 @@ class DQL(SQL):
         cln = clone(self)
         cln._where = config.read()
         return cln
-        
+
     def orderby(self, field, desc=False, key=None):
         """
         field: str, name of field
@@ -511,13 +623,15 @@ class DML(SQL):
         return ('WHERE %s' % self._where) if self._where else None  
 
 if __name__ == '__main__':
-    a = config('a', 1)
-    b = config('b__gt', 2)
-    c = config('c__lte', 3)
-    d = a & b & c
-    print(a.read())
-    print(b.read())
-    print(c.read())
-    print(d.read())
-    print(config.isrich('ab__lt'))
-    print(config.resolve('a__lt'))
+    import doctest
+    doctest.testmod()
+    # a = config('a', 1)
+    # b = config('b__gt', 2)
+    # c = config('c__lte', 3)
+    # d = a & b & c
+    # print(a.read())
+    # print(b.read())
+    # print(c.read())
+    # print(d.read())
+    # print(config.isrich('ab__lt'))
+    # print(config.resolve('a__lt'))
