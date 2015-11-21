@@ -3,10 +3,12 @@
 # @Author: edward
 # @Date:   2015-11-20 20:45:05
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-20 21:59:17
+# @Last Modified time: 2015-11-21 20:54:31
 __metaclass__ = type
-from .utils import connect, StringType, clone
-
+try:
+    from utils import connect, StringType, clone, dq
+except ImportError:
+    from .utils import connect, StringType, clone, dq
 
 class Joint:
 
@@ -37,17 +39,6 @@ OPERATORS = {
     'like': 'LIKE',
 }
 
-def dq(s):
-    """
-    double-quote str object, e.g. 
-    'a' --> '"a"'
-    or apply str to non-str object 
-    100 --> '100'
-    """
-    if isinstance(s, StringType):
-        return '"%s"' % s.replace('"', '')
-    else:
-        return str(s)
 
 class Config:
     """
@@ -243,7 +234,7 @@ class SQL:
         tb = self._access_table(tblname)      
         tb.set_alias(alias)
         self._table = tb
-        return self.clone
+        return self
 
     @property
     def fields(self):
@@ -391,23 +382,17 @@ class DQL(SQL):
         cursor.execute(self.write(*args, **kwargs))
         return cursor.queryset()
 
-    def queryone(self, *args, **kwargs):
-        cursor = self.cursor()
-        cursor.execute(self.write(*args, **kwargs))
-        return cursor.fetchone()
-
     def inner_join(self, tblname, on, alias):
         tb = self._access_table(tblname)
         tb.set_alias(alias)
         self._joints.append(Joint(tb,on))
         return self.clone
 
-    def where(self, dictObj={}, **kwargs):
-        _dictObj = dictObj.copy()
-        _dictObj.update(**kwargs)
-        self._where = Condition(_dictObj).clause()
-        return self.clone
-
+    def where(self, config):
+        cln = clone(self)
+        cln._where = config.read()
+        return cln
+        
     def orderby(self, field, desc=False, key=None):
         """
         field: str, name of field
@@ -480,11 +465,10 @@ class DML(SQL):
         cursor.execute(self.write('update'))
         return self
 
-    def where(self, dictObj={}, **kwargs):
-        _do = dictObj.copy()
-        _do.update(kwargs)
-        self._where = Condition(_do).clause()
-        return self
+    def where(self, config):
+        cln = clone(self)
+        cln._where = config.read()
+        return cln
 
     def write(self, key):
         # to write sql for operation of `insert` or `update` or `delete`
