@@ -3,12 +3,13 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-18 21:43:12
+# @Last Modified time: 2015-11-21 13:28:53
+
 try:
-    from pymysql.cursors import SSDictCursor
+    from pymysql.cursors import DictCursor
     from pymysql.connections import Connection
 except ImportError:
-    from MySQLdb.cursors import SSDictCursor
+    from MySQLdb.cursors import DictCursor
     from MySQLdb.connections import Connection
 from operator import itemgetter
 from itertools import islice
@@ -28,7 +29,7 @@ StringType = string_type()
 
 def connect(**kwargs):
     """
-    A wrapped function based on 'MySQLdb.connections.Connection' returns a 'Connection' instance.
+    A wrapped function based on '.connections.Connection' returns a 'Connection' instance.
     """
     kwargs['cursorclass'] = kwargs.pop('cursorclass', None) or Cursor
     kwargs['charset'] = kwargs.pop('charset', None) or 'utf8'
@@ -43,7 +44,7 @@ def dedupe(items):
             seen.add(item)
 
 
-class Cursor(SSDictCursor):
+class Cursor(DictCursor):
 
     def __enter__(self):
         return self
@@ -58,44 +59,67 @@ class Cursor(SSDictCursor):
 class QuerySet:
 
     """
-    'QuerySet' stands to be receiving a iterable object containing dict-like object.
+    'QuerySet' expects to receive iterable which containing dict-like object.
     """
 
     def __init__(self, iterable):
-        self._resultset = iter(iterable)
+        self._result_set = iter(iterable)
 
     def _retrieve(self):
-        if hasattr(self._resultset, '__enter__'):
-            with self._resultset as _rs:
+        if hasattr(self._result_set, '__enter__'):
+            with self._result_set as _rs:
                 for r in _rs:
                     yield r
         else:
-            for r in self._resultset:
+            for r in self._result_set:
                 yield r
 
     def __iter__(self):
         return self._retrieve()
 
-    def groupby(self, fieldname):
-        _dict = Storage()
-        _key = itemgetter(fieldname)
+    def groupby(self, key):
+        """
+        Grouping dict-like objects by the given key
+        to make up a dict-like object for finally return
+        >>> years = [{'year':2015}, {'year':2014},{'year':2013}]
+        >>> QuerySet(years).groupby('year')
+        {2013: [{'year': 2013}], 2014: [{'year': 2014}], 2015: [{'year': 2015}]}
+        """
+        stg = Storage()
+        key = itemgetter(key)
         for i in self:
-            k = _key(i)
-            _dict.setdefault(k, [])
-            _dict[k].append(i)
-        return _dict
+            k = key(i)
+            stg.setdefault(k, [])
+            stg[k].append(i)
+        return stg
 
-    def values(self, field, distinct=False):
-        vg = (i[field] for i in self)
+    def values(self, key, distinct=False):
+        """
+        Accessing the values of each dict-like objects by the given key
+        to make up a tuple object for finally return
+        ps: if distinct is given as True, then goes to remove the duplicated elements in order
+        >>> months = [{'month':12},{'month':11},{'month':11}]
+        >>> QuerySet(months).values('month')
+        (12, 11, 11)
+        >>> QuerySet(months).values('month', distinct=True)
+        (12, 11)
+        """
+        vg = (i[key] for i in self)
         if distinct is True:
             return tuple(dedupe(vg))
         else:
             return tuple(vg)
 
     def all(self):
+        """
+        directly returns all dict-like objects in a tuple
+        """
         return tuple(self)
 
     def slice(self, start, stop, step=1):
+        """
+        retrieving a range of the result-set which returns in a tuple
+        """
         return tuple(i for i in islice(self, start, stop, step))
 
 
