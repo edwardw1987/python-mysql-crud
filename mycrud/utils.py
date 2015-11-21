@@ -3,16 +3,18 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-17 16:27:30
+# @Last Modified time: 2015-11-21 13:28:53
+
 try:
-    from pymysql.cursors import SSDictCursor
+    from pymysql.cursors import DictCursor
     from pymysql.connections import Connection
 except ImportError:
-    from MySQLdb.cursors import SSDictCursor
+    from MySQLdb.cursors import DictCursor
     from MySQLdb.connections import Connection
 from operator import itemgetter
 from itertools import islice
 import sys
+from copy import deepcopy as clone
 
 
 def string_type():
@@ -27,7 +29,7 @@ StringType = string_type()
 
 def connect(**kwargs):
     """
-    A wrapped function based on 'MySQLdb.connections.Connection' returns a 'Connection' instance.
+    A wrapped function based on '.connections.Connection' returns a 'Connection' instance.
     """
     kwargs['cursorclass'] = kwargs.pop('cursorclass', None) or Cursor
     kwargs['charset'] = kwargs.pop('charset', None) or 'utf8'
@@ -42,14 +44,14 @@ def dedupe(items):
             seen.add(item)
 
 
-class Cursor(SSDictCursor):
+class Cursor(DictCursor):
 
     def __enter__(self):
         return self
 
     def __exit__(self, et, ev, tb):
         return self.close()
-    
+
     def queryset(self):
         return QuerySet(self)
 
@@ -57,50 +59,74 @@ class Cursor(SSDictCursor):
 class QuerySet:
 
     """
-        'QuerySet' receives an instance of 'SSDictCursor' as argument.
-
+    'QuerySet' expects to receive iterable which containing dict-like object.
     """
 
-    def __init__(self, cursor):
-        self.cursor = cursor
+    def __init__(self, iterable):
+        self._result_set = iter(iterable)
 
     def _retrieve(self):
-        for row in self.cursor:
-            yield row
+        if hasattr(self._result_set, '__enter__'):
+            with self._result_set as _rs:
+                for r in _rs:
+                    yield r
         else:
-            self.cursor.close()
+            for r in self._result_set:
+                yield r
 
     def __iter__(self):
         return self._retrieve()
 
-    def groupby(self, fieldname):
-        _dict = {}
-        _key = itemgetter(fieldname)
+    def groupby(self, key):
+        """
+        Grouping dict-like objects by the given key
+        to make up a dict-like object for finally return
+        >>> years = [{'year':2015}, {'year':2014},{'year':2013}]
+        >>> QuerySet(years).groupby('year')
+        {2013: [{'year': 2013}], 2014: [{'year': 2014}], 2015: [{'year': 2015}]}
+        """
+        stg = Storage()
+        key = itemgetter(key)
         for i in self:
-            k = _key(i)
-            _dict.setdefault(k, [])
-            _dict[k].append(i)
-        return _dict
+            k = key(i)
+            stg.setdefault(k, [])
+            stg[k].append(i)
+        return stg
 
-    def values(self, field, distinct=False):
-        vg = (i[field] for i in self)
+    def values(self, key, distinct=False):
+        """
+        Accessing the values of each dict-like objects by the given key
+        to make up a tuple object for finally return
+        ps: if distinct is given as True, then goes to remove the duplicated elements in order
+        >>> months = [{'month':12},{'month':11},{'month':11}]
+        >>> QuerySet(months).values('month')
+        (12, 11, 11)
+        >>> QuerySet(months).values('month', distinct=True)
+        (12, 11)
+        """
+        vg = (i[key] for i in self)
         if distinct is True:
             return tuple(dedupe(vg))
         else:
             return tuple(vg)
 
     def all(self):
+        """
+        directly returns all dict-like objects in a tuple
+        """
         return tuple(self)
 
     def slice(self, start, stop, step=1):
         """
-        don't consume
-        start, stop, step
+        retrieving a range of the result-set which returns in a tuple
         """
         return tuple(i for i in islice(self, start, stop, step))
 
 
 class Storage(dict):
+
+    def __iter__(self):
+        return iter(self.items())
 
     def __getattr__(self, key):
         try:
@@ -116,6 +142,6 @@ class Storage(dict):
             del self[key]
         except KeyError as K:
             raise AttributeError(k)
-
-    def __repr__(self):
-        return '<Storage ' + dict.__repr__(self) + '>'
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
