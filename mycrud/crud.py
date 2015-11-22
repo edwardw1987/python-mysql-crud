@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-20 20:45:05
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-22 16:07:00
+# @Last Modified time: 2015-11-22 16:12:20
 __metaclass__ = type
 try:
     from utils import connect, StringType, clone, dq
@@ -100,7 +100,7 @@ class Hack:
         >>> c
         '(a > 1 OR b < 2)'
         >>> d = Hack('d'); e = Hack('e')
-        >>> d.set('like', 'hello%')
+        >>> d.set('like', dq('hello%'))
         >>> e.set('in', (1,2,3,4,5))
         >>> d & (e | c)
         'd like "hello%" AND (e in (1, 2, 3, 4, 5) OR (a > 1 OR b < 2))'
