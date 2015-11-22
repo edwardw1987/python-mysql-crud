@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-21 13:28:53
+# @Last Modified time: 2015-11-21 20:44:29
 
 try:
     from pymysql.cursors import DictCursor
@@ -25,6 +25,28 @@ def string_type():
         _str = str
     return _str
 StringType = string_type()
+
+
+def dq(s):
+    """
+    double-quote str object, e.g. 
+    'a' --> '"a"'
+    or apply str to non-str object 
+    100 --> '100'
+    """
+    if isinstance(s, StringType):
+        return '"%s"' % s.replace('"', '')
+    else:
+        return str(s)
+
+        
+def isnumberic(s):
+    try:
+        int(s)
+    except ValueError:
+        return False
+    else:
+        return True
 
 
 def connect(**kwargs):
@@ -59,7 +81,7 @@ class Cursor(DictCursor):
 class QuerySet:
 
     """
-    'QuerySet' expects to receive iterable which containing dict-like object.
+    'QuerySet' expects to receive iterable which containing dict-like objects.
     """
 
     def __init__(self, iterable):
@@ -89,7 +111,7 @@ class QuerySet:
         key = itemgetter(key)
         for i in self:
             k = key(i)
-            stg.setdefault(k, [])
+            stg[k] = []
             stg[k].append(i)
         return stg
 
@@ -123,25 +145,49 @@ class QuerySet:
         return tuple(i for i in islice(self, start, stop, step))
 
 
-class Storage(dict):
+class _S:
+
+    """
+    >>> s = _S()
+    >>> s[1] = 2
+    >>> s[1] = 3
+    >>> s[1]
+    2
+    >>> s.a = 4
+    >>> s.a = 5
+    >>> s.a
+    4
+    >>> s = _S()
+    >>> s['a'] = 1
+    >>> s['b'] = 2
+    >>> s['c'] = 3
+    >>> sorted(s, key=lambda x:x[-1])
+    [('a', 1), ('b', 2), ('c', 3)]
+    """
 
     def __iter__(self):
-        return iter(self.items())
+        return iter(self.__dict__.items())
 
-    def __getattr__(self, key):
-        try:
-            return self[key]
-        except KeyError as k:
-            raise AttributeError(k)
+    def __repr__(self):
+        return repr(self.__dict__)
 
-    def __setattr__(self, key, value):
-        self[key] = value
+    def __setitem__(self, k, v):
+        return self._add(k, v)
 
-    def __delattr__(self, key):
-        try:
-            del self[key]
-        except KeyError as K:
-            raise AttributeError(k)
+    def __getitem__(self, k):
+        return self.__dict__[k]
+
+    def __setattr__(self, k, v):
+        return self._add(k, v)
+
+    def _add(self, k, v):
+        dt = self.__dict__
+        if k not in dt:
+            dt[k] = v
+
+
+Storage = _S
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()

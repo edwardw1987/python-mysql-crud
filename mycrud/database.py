@@ -3,11 +3,15 @@
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-18 22:11:24
+# @Last Modified time: 2015-11-21 20:33:36
 __metaclass__ = type
-from .utils import connect, Storage, StringType
-from .crud import DQL, DML
-
+try:
+    from utils import connect, Storage, StringType, clone, isnumberic
+    from crud import DQL, DML
+except ImportError:
+    from .utils import connect, Storage, StringType, clone, isnumberic
+    from .crud import DQL, DML
+        
 
 class DataBase:
 
@@ -24,18 +28,21 @@ class DataBase:
             host=self.host,
             db=self.name,
             user=self.user,
-            passwd=self.passwd
-        ).cursor()
+            passwd=self.passwd).cursor()
 
     def _init_db(self):
-        mapping = self._init_mapping()
-        for tblname, fl in mapping.items():
-            self._init_table(tblname, fl)
+        for tblname, fields in self._init_mapping():
+            self._init_table(tblname, fields)
 
     def _init_table(self, tblname, fields):
         self.tables[tblname] = Table(name=tblname, fields=fields)
 
     def _init_mapping(self):
+        """
+        The instantiating of 'DataBase' will cause connecting to the virtual databse,
+        from which executing [sql] to read the basic message. Once the dql-operation has been done,
+        the db-cursor closed immediately, so that it takes slight performance-price.
+        """
         with self.cursor() as cursor:
             cursor.execute('SHOW TABLES')
             tables = Storage()
@@ -45,26 +52,23 @@ class DataBase:
                     break
             for key, val in tables:
                 cursor.execute('DESC %s' % key)
-                ls = tables[key]
                 for r in cursor:
-                    ls.append(r['Field'])
-                tables[key] = tuple(tables[key])
+                    val.append(r['Field'])
+                tables[key] = tuple(val)
         return tables
 
-    def GetTable(self, tblname):
-        return self.tables[tblname]
-
-    def IterTable(self, fieldname):
-        for table in self.tables.values():
-            if fieldname in table.fields:
-                yield table
-
-    def GetField(self, tblname, fieldname):
-        return self.tables[tblname].fields[fieldname]
-
-    def IterField(self, fieldname):
-        for table in self.IterTable(fieldname):
-            yield table.fields[fieldname]
+    def field(self, tblname, fieldname):
+        try:
+            tb = self.tables[tblname]
+        except KeyError:
+            raise ValueError('invalid table name %r' % tblname)
+        else:
+            try:
+                fd = tb.fields[fieldname]
+            except KeyError:
+                raise ValueError('invalid field name %r' % fieldname)
+            else:
+                return clone(fd)
 
     @property
     def dql(self):
@@ -79,28 +83,38 @@ class Table:
 
     """
         represents a table in database
+        >>> t = Table('',['a', 'b'])
+        >>> sorted(t, key=lambda x:x[0])
+        [('a', <Field 'unknown.a'>), ('b', <Field 'unknown.b'>)]
     """
 
-    def __init__(self, name, fields, alias=''):
-        self.name = name
+    def __init__(self, name, fields=[], alias=''):
+        self.initialize(name, fields, alias)
+
+    def initialize(self, name, fields, alias):
+        """
+        name: str
+        fields: interable containing field names  
+        alias: str
+        """
+        self.name = name or 'unknown'
         self.alias = alias
         self._init_fields(fields)
+
+    def __iter__(self):
+        return iter(self.fields)
+
+    def __repr__(self):
+        return '<%s %r>' % (self.__class__.__name__, self.name)
 
     def _init_fields(self, fields):
         self.fields = Storage()
         for fname in fields:
-            self.fields[fname] = Field(tb=self, name=fname)
-
-    def iterfields(self):
-        for f in self.fields.values():
-            yield f
+            self.fields[fname] = Field(parent=self, name=fname)
 
     def iterfieldnames(self):
-        for f in self.iterfields():
+        for _, f in self:
             yield (f.mutation or '%s.%s' % (self.alias or self.name, f.name))
-
-    def __repr__(self):
-        return '<type: %r, name: %r, alias: %r>' % (self.__class__.__name__, self.name, self.alias)
 
     def set_alias(self, alias):
         try:
@@ -110,28 +124,61 @@ class Table:
         else:
             self.alias = alias
 
+    def add_field(self, fname):
+        """
+        >>> t = Table('tb')
+        >>> t.add_field('fd')
+        >>> t.fields
+        {'fd': <Field 'tb.fd'>}
+        """
+        if isinstance(fname, StringType) and len(fname) > 0 and not isnumberic(fname):
+            self.fields[fname] = Field(self, fname)
+        else:
+            raise ValueError('invalid fieldname %r' % fname)
+
 
 class Field:
 
-    def __init__(self, tb, name):
-        self.tb = tb
+    def __init__(self, parent, name):
+        """
+        name: str
+        parent: Table object
+        """
+        self.initialize(parent, name)
+
+    def __repr__(self):
+        return '<%s %r>' % (self.__class__.__name__, self.fullname)
+
+    def initialize(self, parent, name):
+        self.parent = parent
         self.name = name
         self._mutation = None
 
     @property
     def fullname(self):
-        return '%s.%s' % (
-            self.tb.alias or self.tb.name,
-            self.name)
-
+        F = '%s.%s'
+        a = getattr(self.parent, 'alias', '')
+        n = getattr(self.parent, 'name', '')
+        return F % (a or n, self.name)
+        
     @property
     def mutation(self):
         return self._mutation
 
     def date_format(self, fmt, alias=''):
+        """
+        >>> t = Table('table')
+        >>> f = Field(t,'field')
+        >>> f.date_format('%Y-%m-%d','abc')
+        "DATE_FORMAT(table.field, '%Y-%m-%d') AS abc"
+        """
         mut = 'DATE_FORMAT(%s, %r) AS %s' % (
             self.fullname,
             fmt,
             alias or self.name)
         self._mutation = mut
         return mut
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()

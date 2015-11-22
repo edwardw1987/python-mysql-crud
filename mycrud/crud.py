@@ -3,9 +3,13 @@
 # @Author: edward
 # @Date:   2015-11-20 20:45:05
 # @Last Modified by:   edward
-# @Last Modified time: 2015-11-20 21:59:17
+# @Last Modified time: 2015-11-22 16:07:00
 __metaclass__ = type
-from .utils import connect, StringType, clone
+try:
+    from utils import connect, StringType, clone, dq
+except ImportError:
+    from .utils import connect, StringType, clone, dq
+import re
 
 
 class Joint:
@@ -27,167 +31,148 @@ class Joint:
         self.duplication = self.rel.split('=')[0].strip()
     
 # ====================
-OPERATORS = {
-    'eq': '=',
-    'lt': '<',
-    'lte': '<=',
-    'gt': '>',
-    'gte': '>=',
-    'in': 'IN',
-    'like': 'LIKE',
-}
 
-def dq(s):
+class Hack:
     """
-    double-quote str object, e.g. 
-    'a' --> '"a"'
-    or apply str to non-str object 
-    100 --> '100'
+    Hacking default behavior of signs
     """
-    if isinstance(s, StringType):
-        return '"%s"' % s.replace('"', '')
-    else:
-        return str(s)
-
-class Config:
-    """
-    richkey: str, startswith 'tablename(alias).fieldname', endswith '__xxx' or not
-    val: pyobject supports to be operated in 'SQL' syntax, usually str, int except for None, False, True
-    one richkey could be 'key__lt' which endswith one tail of '__lt', 
-    that means to use '<' as the operator of config object.
-    (each tails mapping to the operator in 'SQL' syntax)
-    richkey supports following tails (inspired by django orm):
-    1. 'eq': '=', the default tail to richkey if the tail is not given
-    2. 'lt': '<', less than
-    3. 'lte': '<=', less than or equal 
-    4. 'gt': '>' greater than
-    5. 'gte': '>='
-    6. 'in': 'IN', the parameter 'val' should be in a range, such as ('a', 'b', 'c')
-        (especially, str object is supported e.g. 'abc')
-    7. 'like': 'LIKE'
-    """
-    def __init__(self, richkey, val):
-        self.initialize(richkey, val)
+    def __init__(self, key):
+        self.key = key
 
     def __repr__(self):
         return repr(self.read())
 
-    def __and__(self, config):
-        if getattr(config, '_config', None) is None:
-            raise TypeError("unsupported type of %r" % config.__class__.__name__)
-        else:
-            _cnf = self._config
-            c_cnf = config._config
-            if _cnf in c_cnf:
-                raise ValueError("duplicated value of %r" % c_cnf)
-            else:
-                cln = clone(self)
-                cln._config = ' AND '.join([_cnf, c_cnf])
-                return cln
-
-    def __or__(self, config):
-        if getattr(config, '_config', None) is None:
-            raise TypeError("unsupported type of %r" % config.__class__.__name__)
-        else:
-            _cnf = self._config
-            c_cnf = config._config
-            if _cnf in c_cnf:
-                raise ValueError("duplicated value of %r" % c_cnf)
-            else:
-                cln = clone(self)
-                cln._config = '(' + ' OR '.join([_cnf, c_cnf]) + ')'
-                return cln
-        
-    def initialize(self, richkey, val):
-        self._resolve_richkey(richkey)
-        self._handle_value(val)
-        self._handle_config()
-
-    def _handle_config(self):
+    def set(self, sign, val):
         """
-        To combine together key, operator and value, finally return the combination
+        >>> h = Hack('h')
+        >>> h.set('in', (1, 2, 3))
+        >>> h.set('like','abc%')
         """
-        F = '{key}{operator}{value}'
-        # key
-        k = self._key
-        # operator
-        t = self._tail or 'eq'
-        opt = OPERATORS[t]
-        # value
-        val = v = self._value
-        if t == 'in':
-            val = self._handle_in(v)
-        elif t == 'like':
-            val = self._handle_like(v)
-        else:
-            val = self._handle_common(v)
-        self._config = F.format(key=k, operator=opt, value=val)
-
-    def _handle_in(self, val):
-        return '(' + ', '.join(dq(e) for e in val) + ')'
-
-    def _handle_like(self, val):
-        pass
-
-    def _handle_common(self, val):
-        return val 
-
-    def set(self, richkey, val):
-        self.initialize(richkey, val)
+        self._exp = ('%s {} %s'.format(sign)) % (self.key, val)
 
     def read(self):
-        return self._config
+        return getattr(self, '_group', getattr(self, '_exp', ''))
 
-    @staticmethod
-    def validate(val):
-        return
-        if (val is None) or (val is False) or (val is True):
-            raise ValueError('invalid value %r' % val)
-
-    @classmethod
-    def isrich(cls, key):
-        rsk = cls.resolve(key)
-        if len(rsk) == 1:
-            return False
-        else:
-            return True
-
-    def _resolve_richkey(self, richkey):
-        rsk = self.resolve(richkey)
-        if len(rsk) == 1:
-            self._key, = rsk
-            self._tail = None
-        else:
-            self._key, self._tail = rsk 
-
-    def _handle_value(self, val):
-        self.validate(val)
-        self._value = val 
-
-    @staticmethod
-    def resolve(richkey):
+    def resolve(self):
         """
-        richkey: str
-        resovle from --> to
-        'key__tail'  --> ('key', 'tail')
-        'key'        --> ('key', '')
+        >>> a = Hack('a'); b = Hack('b')
+        >>> a.resolve()
+        ()
+        >>> a > 123; b < 456;
+        >>> c = a & b 
+        >>> a.resolve()
+        ('a > 123',)
+        >>> c.resolve()
+        ('a > 123', 'b < 456')
         """
-        if len(richkey) != 0:
-            if '__' in richkey:
-                key, tail = richkey.split('__')
-                if len(key) > 0 and len(tail) > 0:
-                    if tail in OPERATORS:
-                        return key, tail
-                    else:
-                        raise ValueError('invalid richkey tail %r' % tail)
-                else:
-                    raise ValueError('invalid richkey %r' % richkey)
+        return tuple(i for i in map(str.strip, re.split(r'AND|OR|\)|\(', self.read())) if i != '')
+
+    def __and__(self, hack):
+        """
+        >>> a = Hack('a'); b = Hack('b')
+        >>> a > 1; b < 2
+        >>> c = a & b
+        >>> c
+        'a > 1 AND b < 2'
+        >>> a
+        'a > 1'
+        >>> b
+        'b < 2'
+        """
+        if not isinstance(hack, Hack):
+            raise TypeError("unsupported type of %r" % hack.__class__.__name__)
+        else:
+            se = self.resolve()
+            he = hack.resolve()
+            sh = tuple(set(se) & set(he))
+            if len(sh) > 0:
+                raise ValueError("duplicated value %r" % sh[0])
             else:
-                return richkey,
-        else:
-            raise ValueError('invalid richkey %r' % richkey)
+                cln = clone(self)
+                cln._group = ' AND '.join(i for i in [self.read(), hack.read()] if i != '')
+                return cln
 
-config = Config
+    def __or__(self, hack):
+        """
+        >>> a = Hack('a'); b = Hack('b')
+        >>> a > 1; b < 2
+        >>> c = a | b
+        >>> c
+        '(a > 1 OR b < 2)'
+        >>> d = Hack('d'); e = Hack('e')
+        >>> d.set('like', 'hello%')
+        >>> e.set('in', (1,2,3,4,5))
+        >>> d & (e | c)
+        'd like "hello%" AND (e in (1, 2, 3, 4, 5) OR (a > 1 OR b < 2))'
+        """
+        if not isinstance(hack, Hack):
+            raise TypeError("unsupported type of %r" % hack.__class__.__name__)
+        else:
+            se = self.resolve()
+            he = hack.resolve()
+            sh = tuple(set(se) & set(he))
+            if len(sh) > 0:
+                raise ValueError("duplicated value %r" % sh[0])
+            else:
+                cln = clone(self)
+                cln._group = '(' + ' OR '.join(i for i in [self.read(), hack.read()] if i != '') + ')'
+                return cln
+
+    def __eq__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h == 3
+        >>> h 
+        'key = 3'
+        """
+        self.set('=', val)
+
+    def __ne__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h != 3
+        >>> h
+        'key != 3'
+        """
+        self.set('!=', val)
+
+    def __gt__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h > 3
+        >>> h
+        'key > 3'
+        """
+        self.set('>', val)
+
+    def __ge__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h >= 3
+        >>> h
+        'key >= 3'
+        """
+        self.set('>=', val)
+
+    def __lt__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h < 3
+        >>> h
+        'key < 3'
+        """
+        self.set('<', val)
+
+    def __le__(self, val):
+        """
+        >>> h = Hack('key')
+        >>> h <= 3
+        >>> h
+        'key <= 3'
+        """
+        self.set('<=', val)
+
+# ====================
 
 class SQL:
 
@@ -243,7 +228,7 @@ class SQL:
         tb = self._access_table(tblname)      
         tb.set_alias(alias)
         self._table = tb
-        return self.clone
+        return self
 
     @property
     def fields(self):
@@ -391,22 +376,16 @@ class DQL(SQL):
         cursor.execute(self.write(*args, **kwargs))
         return cursor.queryset()
 
-    def queryone(self, *args, **kwargs):
-        cursor = self.cursor()
-        cursor.execute(self.write(*args, **kwargs))
-        return cursor.fetchone()
-
     def inner_join(self, tblname, on, alias):
         tb = self._access_table(tblname)
         tb.set_alias(alias)
         self._joints.append(Joint(tb,on))
         return self.clone
 
-    def where(self, dictObj={}, **kwargs):
-        _dictObj = dictObj.copy()
-        _dictObj.update(**kwargs)
-        self._where = Condition(_dictObj).clause()
-        return self.clone
+    def where(self, hack):
+        cln = clone(self)
+        cln._where = hack.read()
+        return cln
 
     def orderby(self, field, desc=False, key=None):
         """
@@ -480,11 +459,10 @@ class DML(SQL):
         cursor.execute(self.write('update'))
         return self
 
-    def where(self, dictObj={}, **kwargs):
-        _do = dictObj.copy()
-        _do.update(kwargs)
-        self._where = Condition(_do).clause()
-        return self
+    def where(self, hack):
+        cln = clone(self)
+        cln._where = hack.read()
+        return cln
 
     def write(self, key):
         # to write sql for operation of `insert` or `update` or `delete`
@@ -527,13 +505,5 @@ class DML(SQL):
         return ('WHERE %s' % self._where) if self._where else None  
 
 if __name__ == '__main__':
-    a = config('a', 1)
-    b = config('b__gt', 2)
-    c = config('c__lte', 3)
-    d = a & b & c
-    print(a.read())
-    print(b.read())
-    print(c.read())
-    print(d.read())
-    print(config.isrich('ab__lt'))
-    print(config.resolve('a__lt'))
+    import doctest
+    doctest.testmod()
