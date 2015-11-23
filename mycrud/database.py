@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
-# @Last Modified by:   edward
-# @Last Modified time: 2015-11-21 20:33:36
+# @Last Modified by:   python
+# @Last Modified time: 2015-11-23 09:42:02
 __metaclass__ = type
 try:
-    from utils import connect, Storage, StringType, clone, isnumberic
+    from utils import connect, Storage, StringType, clone
     from crud import DQL, DML
 except ImportError:
-    from .utils import connect, Storage, StringType, clone, isnumberic
+    from .utils import connect, Storage, StringType, clone
     from .crud import DQL, DML
         
 
@@ -131,7 +131,7 @@ class Table:
         >>> t.fields
         {'fd': <Field 'tb.fd'>}
         """
-        if isinstance(fname, StringType) and len(fname) > 0 and not isnumberic(fname):
+        if isinstance(fname, StringType) and len(fname) > 0 and not isinstance(fname, int):
             self.fields[fname] = Field(self, fname)
         else:
             raise ValueError('invalid fieldname %r' % fname)

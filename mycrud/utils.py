@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
-# @Last Modified by:   edward
-# @Last Modified time: 2015-11-21 20:44:29
+# @Last Modified by:   python
+# @Last Modified time: 2015-11-23 09:44:28
 
 try:
     from pymysql.cursors import DictCursor
@@ -27,7 +27,7 @@ def string_type():
 StringType = string_type()
 
 
-def dq(s):
+def doublequote(s):
     """
     double-quote str object, e.g. 
     'a' --> '"a"'
@@ -38,15 +38,6 @@ def dq(s):
         return '"%s"' % s.replace('"', '')
     else:
         return str(s)
-
-        
-def isnumberic(s):
-    try:
-        int(s)
-    except ValueError:
-        return False
-    else:
-        return True
 
 
 def connect(**kwargs):

@@ -6,9 +6,9 @@
 # @Last Modified time: 2015-11-22 16:11:35
 __metaclass__ = type
 try:
-    from utils import connect, StringType, clone, dq
+    from utils import connect, StringType, clone, doublequote as dq
 except ImportError:
-    from .utils import connect, StringType, clone, dq
+    from .utils import connect, StringType, clone, doublequote as dq
 import re
 
 
