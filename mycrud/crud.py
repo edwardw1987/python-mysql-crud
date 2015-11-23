@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-11-20 20:45:05
-# @Last Modified by:   edward
-# @Last Modified time: 2015-11-22 16:12:20
+# @Last Modified by:   python
+# @Last Modified time: 2015-11-23 09:44:28
 __metaclass__ = type
 try:
-    from utils import connect, StringType, clone, dq
+    from utils import connect, StringType, clone, doublequote as dq
 except ImportError:
-    from .utils import connect, StringType, clone, dq
+    from .utils import connect, StringType, clone, doublequote as dq
 import re
 
 
