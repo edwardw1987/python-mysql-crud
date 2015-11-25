@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-11-06 11:29:13
-# @Last Modified by:   python
-# @Last Modified time: 2015-11-23 09:44:28
+# @Last Modified by:   edward
+# @Last Modified time: 2015-11-25 13:33:07
 
 try:
     from pymysql.cursors import DictCursor
@@ -152,7 +152,7 @@ class _S:
     >>> s['a'] = 1
     >>> s['b'] = 2
     >>> s['c'] = 3
-    >>> sorted(s, key=lambda x:x[-1])
+    >>> sorted(s)
     [('a', 1), ('b', 2), ('c', 3)]
     """
 

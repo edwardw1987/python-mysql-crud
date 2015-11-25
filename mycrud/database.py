@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-11-07 14:51:48
-# @Last Modified by:   python
-# @Last Modified time: 2015-11-23 09:42:02
+# @Last Modified by:   edward
+# @Last Modified time: 2015-11-25 13:34:18
 __metaclass__ = type
 try:
     from utils import connect, Storage, StringType, clone
@@ -84,7 +84,7 @@ class Table:
     """
         represents a table in database
         >>> t = Table('',['a', 'b'])
-        >>> sorted(t, key=lambda x:x[0])
+        >>> sorted(t)
         [('a', <Field 'unknown.a'>), ('b', <Field 'unknown.b'>)]
     """
 
