@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # @Author: edward
 # @Date:   2015-11-20 20:45:05
-# @Last Modified by:   python
-# @Last Modified time: 2015-11-23 09:44:28
+# @Last Modified by:   edward
+# @Last Modified time: 2015-12-01 23:01:50
 __metaclass__ = type
 try:
     from utils import connect, StringType, clone, doublequote as dq
@@ -46,9 +46,12 @@ class Hack:
         """
         >>> h = Hack('h')
         >>> h.set('in', (1, 2, 3))
+        'h in (1, 2, 3)'
         >>> h.set('like','abc%')
+        'h like abc%'
         """
         self._exp = ('%s {} %s'.format(sign)) % (self.key, val)
+        return self
 
     def read(self):
         return getattr(self, '_group', getattr(self, '_exp', ''))
@@ -101,7 +104,9 @@ class Hack:
         '(a > 1 OR b < 2)'
         >>> d = Hack('d'); e = Hack('e')
         >>> d.set('like', dq('hello%'))
+        'd like "hello%"'
         >>> e.set('in', (1,2,3,4,5))
+        'e in (1, 2, 3, 4, 5)'
         >>> d & (e | c)
         'd like "hello%" AND (e in (1, 2, 3, 4, 5) OR (a > 1 OR b < 2))'
         """
