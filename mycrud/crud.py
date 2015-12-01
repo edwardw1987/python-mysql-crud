@@ -3,7 +3,7 @@
 # @Author: edward
 # @Date:   2015-11-20 20:45:05
 # @Last Modified by:   edward
-# @Last Modified time: 2015-12-01 23:01:50
+# @Last Modified time: 2015-12-01 23:11:44
 __metaclass__ = type
 try:
     from utils import connect, StringType, clone, doublequote as dq
@@ -58,10 +58,7 @@ class Hack:
 
     def resolve(self):
         """
-        >>> a = Hack('a'); b = Hack('b')
-        >>> a.resolve()
-        ()
-        >>> a > 123; b < 456;
+        >>> a = Hack('a') > 123; b = Hack('b') < 456
         >>> c = a & b 
         >>> a.resolve()
         ('a > 123',)
@@ -72,8 +69,7 @@ class Hack:
 
     def __and__(self, hack):
         """
-        >>> a = Hack('a'); b = Hack('b')
-        >>> a > 1; b < 2
+        >>> a = Hack('a') > 1; b = Hack('b') < 2
         >>> c = a & b
         >>> c
         'a > 1 AND b < 2'
@@ -97,8 +93,7 @@ class Hack:
 
     def __or__(self, hack):
         """
-        >>> a = Hack('a'); b = Hack('b')
-        >>> a > 1; b < 2
+        >>> a = Hack('a') > 1; b = Hack('b') < 2
         >>> c = a | b
         >>> c
         '(a > 1 OR b < 2)'
@@ -125,57 +120,51 @@ class Hack:
 
     def __eq__(self, val):
         """
-        >>> h = Hack('key')
-        >>> h == 3
+        >>> h = Hack('key') == 3
         >>> h 
         'key = 3'
         """
-        self.set('=', val)
+        return self.set('=', val)
 
     def __ne__(self, val):
         """
-        >>> h = Hack('key')
-        >>> h != 3
+        >>> h = Hack('key') != 3
         >>> h
         'key != 3'
         """
-        self.set('!=', val)
+        return self.set('!=', val)
 
     def __gt__(self, val):
         """
-        >>> h = Hack('key')
-        >>> h > 3
+        >>> h = Hack('key') > 3
         >>> h
         'key > 3'
         """
-        self.set('>', val)
+        return self.set('>', val)
 
     def __ge__(self, val):
         """
-        >>> h = Hack('key')
-        >>> h >= 3
+        >>> h = Hack('key') >= 3
         >>> h
         'key >= 3'
         """
-        self.set('>=', val)
+        return self.set('>=', val)
 
     def __lt__(self, val):
         """
-        >>> h = Hack('key')
-        >>> h < 3
+        >>> h = Hack('key') < 3
         >>> h
         'key < 3'
         """
-        self.set('<', val)
+        return self.set('<', val)
 
     def __le__(self, val):
         """
-        >>> h = Hack('key')
-        >>> h <= 3
+        >>> h = Hack('key') <= 3
         >>> h
         'key <= 3'
         """
-        self.set('<=', val)
+        return self.set('<=', val)
 
 # ====================
 
